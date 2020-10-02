@@ -1,0 +1,43 @@
+{
+  "name": "kotanipay",
+  "description": "Kotanipay USSD App functions",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "10"
+  },
+  "dependencies": {
+    "@celo/contractkit": "^0.4.14",
+    "africastalking": "^0.5.2",
+    "axios": "^0.20.0",
+    "bip39-light": "^1.0.7",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.5",
+    "cors": "^2.8.5",
+    "ethereumjs-util": "^7.0.5",
+    "express": "^4.17.1",
+    "express-bearer-token": "^2.4.0",
+    "firebase-admin": "^9.2.0",
+    "firebase-functions": "^3.11.0",
+    "icon-sdk-js": "0.0.18",
+    "jsonwebtoken": "^8.5.1",
+    "morgan": "^1.10.0",
+    "mpesa-api": "^2.3.3",
+    "mpesa-node": "^0.1.3",
+    "node-telegram-bot-api": "^0.50.0",
+    "path": "^0.12.7",
+    "prettyjson": "^1.2.1",
+    "randomstring": "^1.1.5",
+    "tinyurl": "^1.1.7",
+    "ussd-router": "^0.1.5"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^0.2.2"
+  },
+  "private": true
+}
