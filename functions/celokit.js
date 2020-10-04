@@ -7,6 +7,9 @@ const bip39 = require('bip39-light');
 const NODE_URL = 'https://celo-mainnet.datahub.figment.network/apikey/b2b43afb38d9a896335580452e687e53/'; 
 const kit = contractkit.newKit(NODE_URL);
 kit.setFeeCurrency(contractkit.CeloContract.StableToken);
+const ethers = require('ethers');
+const provider = new ethers.providers.JsonRpcProvider(NODE_URL);
+const axios = require("axios");
 
 const trimLeading0x = (input) => (input.startsWith('0x') ? input.slice(2) : input);
 const ensureLeading0x = (input) => (input.startsWith('0x') ? input : `0x${input}`);
@@ -242,10 +245,49 @@ async function transfercUSD(sender, receiver, amount, senderprivkey){
       const sellReceipt = await sellTx.waitReceipt()
     }    
   }
-  
+  // getLatestBlock().then(_res=>console.log(_res.number))
   //working
   async function getLatestBlock() {
-    return kit.web3.eth.getBlock('latest');
+    return await kit.web3.eth.getBlock('latest');
+  }
+
+  async function validateWithdrawHash(hash, escrowAddress){
+    // let hash = '0xe27cf9def976382639789d6465872947b6212649f5e64bf0acabcb4d3d8c1563';
+    try{
+      const tx = await provider.getTransactionReceipt(hash);
+      console.log('FROM: ',tx.from)
+      
+      let response  = await axios.get(`https://explorer.celo.org/api?module=account&action=tokentx&address=${tx.from}#`)
+      // console.log(response.data.result.hash);
+      let txhashes = response.data.result;
+      var kotanitxns =  await txhashes.filter(function(txns) {
+          return txns.hash == hash;
+      });
+      var tokotani =  await kotanitxns.filter(function(txns) {
+          return txns.to == escrowAddress;
+      });
+      // console.log(tokotani);
+
+      let txvalues = {
+        "status" : "ok",
+        "from" : tokotani[0].from,
+        "to": tokotani[0].to,
+        "value" : kit.web3.utils.fromWei(tokotani[0].value),
+        "txblock" : tokotani[0].blockNumber
+      };
+
+      // console.log(txvalues);
+
+      return txvalues;
+        
+    }catch(e){
+      console.log("Cant process Invalid Hash");
+      let txvalues = {
+        "status" : "invalid",
+        "message" : "Cant process Invalid Hash"
+      }
+      return txvalues;
+    }
   }
   
 
@@ -264,5 +306,6 @@ async function transfercUSD(sender, receiver, amount, senderprivkey){
     decimaltoWei,
     getContractKit,
     sendcUSD,
-    getLatestBlock
+    getLatestBlock,
+    validateWithdrawHash
  }

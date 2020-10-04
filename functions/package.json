@@ -20,6 +20,7 @@
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
     "ethereumjs-util": "^7.0.5",
+    "ethers": "^5.0.15",
     "express": "^4.17.1",
     "express-bearer-token": "^2.4.0",
     "firebase-admin": "^9.2.0",

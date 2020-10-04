@@ -104,7 +104,8 @@ const { transfercGOLD,
         decimaltoWei,
         sendcUSD,
         getContractKit,
-        getLatestBlock
+        getLatestBlock,
+        validateWithdrawHash
 } = require('./celokit');
 
 const { getIcxUsdtPrice } = require('./iconnect');
@@ -813,92 +814,119 @@ restapi.post("/getkotanipayescrow", async (req, res) => {
 //parameters: {"phoneNumber" : "E.164 number" , "amount" : "value", "txhash" : "value"}
 restapi.post("/withdraw", async (req, res) => {
   let userMSISDN = req.body.phoneNumber;
-  // let amount = req.body.amount;
   let txhash = req.body.txhash;
   try {
     const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
     userMSISDN = phoneUtil.format(recnumber, PNF.E164);
   } catch (error) {console.log(error); }
   userMSISDN = userMSISDN.substring(1);
-  let userId  = await getSenderId(userMSISDN)
+  let userId  = await getSenderId(userMSISDN);
 
-  //txid = "0x80e793600fd6e04fde61e4b0815a3d96f8205ce79c6a388226e60b7b184f472b"
   if(txhash !== null && txhash !==''){  //Check for empty or null tx hash  0xd3625b379fbe8fd5d36906c618f61b53dd8f546e6255a189a7f8be4cc8c00634
-    var txreceipt = await validateCeloTransaction(txhash)
-    var tx = await kit.web3.eth.getTransaction(txhash)
+    var txreceipt = await validateCeloTransaction(txhash);
     if(txreceipt !== null){  //check for a null tx receipt due to invalid hash
-      console.log('Txn Receipt=> ', JSON.stringify(txreceipt))
-      // console.log('Status: ', txreceipt.status)
-      console.log('To: ', tx.to)
-      console.log('To checksum', checksumAddress(txreceipt.to))
+      console.log('Txn Receipt=> ', JSON.stringify(txreceipt));
+      console.log('Status: ', txreceipt.status);
   
-      let escrowId  = await getSenderId(escrowMSISDN)
-      let escrowInfo = await getSenderDetails(escrowId);
+      // let escrowId  = await getSenderId(escrowMSISDN)
+      // let escrowInfo = await getSenderDetails(escrowId);
       // console.log('User Address => ', escrowInfo.data().publicAddress);
+      let escrowAddress = `0xe6b8f07271b97be93d95b18bbe891860b0b7e07f`;
 
-      let txblock = await getTransactionBlock(txhash);
-      console.log('Tx Block', txblock);
-      let validblocks = txblock+1440
-      console.log('Valid Block', validblocks);
-      let latestblock = await getLatestBlock();
-      console.log('Tx Block', txblock);
+      let txdetails = await validateWithdrawHash(txhash, escrowAddress);
+      // console.log(txdetails)
+      if(txdetails.status === "ok"){ //Valid Deposit to Escrow Hash. Get tx Details        
+        // console.log(txdetails)
 
-      //  && validblocks >= latestblock 
-      // address = 0xe6b8f07271b97be93d95b18bbe891860b0b7e07f
-      // && checksumAddress(tx.to) === escrowInfo.data().publicAddress
-      if(txreceipt.status === true ){   //check that the tx TO: address if the kotaniEscrow Address  //"0xe6b8f07271b97be93d95b18bbe891860b0b7e07f"
-        console.log('Tx Receipt Status: ',txreceipt.status)
-        let _amount = await getTxAmountFromHash(txhash);
-        console.log('amount: ', _amount)
-        try{
-          //Forward Tx to Jenga API
-          // let existstatus = await checkIfUserAccountExist(userId, userMSISDN);
-          let userExists = await checkIfSenderExists(userId);
-          if(userExists === false){         
-            let userCreated = await createNewUser(userId, userMSISDN);     
-            console.log('Created user with userID: ', userCreated); 
-          }
-          // console.log('Exists: ',existstatus)
-          // let isVerified = await checkIsUserVerified(senderId)
-          // console.log('Verified: ',isVerified)
-          let isverified = await checkIfUserisVerified(userId);    
-          if(isverified === false){     //  && data[0] !== '7' && data[1] !== '4'
-            // console.log("User: ", senderId, "is NOT VERIFIED!");
-            // msg += `END Verify your account by dialing *483*354*7*4#`;
-            res.json({
-              "status": 'unverified',
-              "message": "user account is not verified",
-              "comment" : "Access https://europe-west3-kotanimac.cloudfunctions.net/restapi/kyc to verify your account"
-            })    
-          }else{
-            let isProcessed = await getProcessedTransaction(txhash);
-            if(isProcessed == true){
-              let message = {
-                "status": `failed`,
-                "message": `Transaction Hash is already processed`
-              };
-              res.json(message);
+        let validblocks = txdetails.txblock;
+        let _validblocks = parseInt(validblocks)
+        _validblocks = _validblocks + 1440
 
+        console.log('Valid Blocks', _validblocks);
+        let latestblock = await getLatestBlock();
+        let _latestblock = parseInt(latestblock.number);
+        console.log('Latest Block', _latestblock);
+        
+        
+        if(txreceipt.status === true && _validblocks >= _latestblock ){   //check that the tx TO: address if the kotaniEscrow Address  //"0xe6b8f07271b97be93d95b18bbe891860b0b7e07f"
+
+          console.log('Processing MPESA withdraw Transaction')
+          try{
+            //Forward Tx to Jenga API
+            // let existstatus = await checkIfUserAccountExist(userId, userMSISDN);
+            let userExists = await checkIfSenderExists(userId);
+            if(userExists === false){         
+              let userCreated = await createNewUser(userId, userMSISDN);     
+              console.log('Created user with userID: ', userCreated); 
+            }
+            // console.log('Exists: ',existstatus)
+            // let isVerified = await checkIsUserVerified(senderId)
+            // console.log('Verified: ',isVerified)
+            let isverified = await checkIfUserisVerified(userId);   
+            console.log('isverified: ', isverified) 
+            // let isKyced = await checkisUserKyced(userId);
+            // if(isKyced == true)
+            if(isverified === false){     //  && data[0] !== '7' && data[1] !== '4'
+              // console.log("User: ", senderId, "is NOT VERIFIED!");
+              // msg += `END Verify your account by dialing *483*354*7*4#`;
+              res.json({
+                "status": 'unverified',
+                "message": "user account is not verified",
+                "comment" : "Access https://europe-west3-kotanimac.cloudfunctions.net/restapi/kyc to verify your account"
+              })    
             }else{
-              let txdetails = {
-                "blockNumber" : await getTransactionBlock(txhash),
-                "value" : _amount,
-                "from" : checksumAddress(tx.from),
-                "to" : checksumAddress(tx.to)
-              }
-              await processApiWithdraw(userMSISDN, "10");
-              await setProcessedTransaction(txhash, txdetails)
-              console.log(txhash, ' Transaction processing successful')
-            }  
-          }
-        }catch(e){console.log(e)}
+              let isProcessed = await getProcessedTransaction(txhash);
+              console.log('isProcessed: ', isProcessed) 
+              if(isProcessed === true){
+                let message = {
+                  "status": `failed`,
+                  "message": `Transaction Hash is already processed`
+                };
+                res.json(message);
+
+              }else{
+                let withdrawDetails = {
+                  "blockNumber" : txdetails.txblock,
+                  "value" : txdetails.value,
+                  "from" : txdetails.from,
+                  "to" : txdetails.to
+                }
+                let amount = number_format(txdetails.value, 4)
+                amount =  amount*100;
+                console.log(`Withdraw Amount KES: ${amount}`);
+
+                let jengaResponse = await processApiWithdraw(userMSISDN, amount);
+                await setProcessedTransaction(txhash, withdrawDetails)
+                console.log(txhash, ' Transaction processing successful')
+                res.json({
+                  "status" : "successful",
+                  "Message" : "Withdraw Transaction processing successful",
+                  "cusdDetails" : withdrawDetails,
+                  "MpesaDetails" : jengaResponse
+                });
+              }  
+            }
+          }catch(e){console.log(e)}
+        }else{
+          let message = {
+            "status": `failed`,
+            "message": `Invalid Transaction`,
+            "blockNumber" : txdetails.txblock,
+            "latestBlock" : _latestblock
+          };
+          console.log('txdetails.status: ', JSON.stringify(txdetails))
+          res.json(message);
+        }
+
       }else{
         let message = {
           "status": `failed`,
-          "message": `Invalid Transaction`
+          "message" : `Invalid Hash`
         };
         res.json(message);
       }
+
+      
 
     }else{
       let message = {
@@ -1105,7 +1133,7 @@ async function processApiWithdraw(withdrawMSISDN, amount){
       "recipientName": displayName,
       "message": `Withdraw via Kotanipay successful`,
       "recipient": `${withdrawMSISDN}`,
-      "amount": `${amount} CUSD`
+      "amount": `${amount} KES`
     };
     return message
     
@@ -1137,7 +1165,7 @@ async function getProcessedTransaction(txhash){
     console.log('No such document!');
   } else {
     processed = true; // do nothing
-    console.log('Document data:', doc.data());
+    console.log('Document data:', JSON.stringify(doc.data()));
   }
   return processed;
 }
