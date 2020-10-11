@@ -989,20 +989,6 @@ restapi.post('/kyc', async (req, res) => {
     res.json(message);
   }else{  //NOT KYC'd
 
-     
-  
-  // let userInfo = await getSenderDetails(userId);
-  // console.log('User Address => ', userInfo.data().publicAddress);
-
-  //check if KYC data already exists
-  //let alreadykyced = await 
- 
-    // let documentType = req.body.documentType;
-    // let documentNumber = req.body.documentNumber;
-    // let firstname = req.body.firstname;
-    // let lastname = req.body.lastname;
-    // let dateofbirth = req.body.dateofbirth;
-    // let email = req.body.emailAddress;
     let newUserPin = "0000";
     let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
 
