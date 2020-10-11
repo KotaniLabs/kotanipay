@@ -21,7 +21,7 @@ How to become an agent
 
 A. Contributing to existing pools
 
-Here a user is required to deposit a pair of assets in given ratios. For example, 10000 Kenya Shillings and 10000 CUSD in the KSH/CUSD pool. Transaction fees charged on users utilizing this pool are distributed to liquidity providers based on their share of the pool. There will be fiat/stablecoin, crypto/stablecoin as well as stablecoin/stablecoin pools available on the Kotani Pay DeFi Network. 
+Here a user is required to deposit a pair of assets in given ratios. For example, 10000 Kenya Shillings and 100 CUSD in the KSH/CUSD pool. Transaction fees charged on users utilizing this pool are distributed to liquidity providers based on their share of the pool. There will be fiat/stablecoin, crypto/stablecoin as well as stablecoin/stablecoin pools available on the Kotani Pay DeFi Network. 
 
 B. Creating a new liquidity pool
 A user can create a pool of their liking from the assets available in the Kotani Pay     Network e.g. Morocco/ETH pool. 
