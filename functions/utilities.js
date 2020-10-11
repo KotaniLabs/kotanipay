@@ -3,6 +3,7 @@ const functions = require('firebase-functions');
 const bodyParser = require('body-parser');
 // const prettyjson = require('prettyjson');
 // var options = { noColor: true };
+const randomstring = require('randomstring')
 
 // AFRICASTALKING API
 const AT_credentials = {
@@ -17,67 +18,67 @@ const sms = AfricasTalking.SMS;
 //SEND GET shortURL
 async function getTxidUrl(txid){
     return await getSentTxidUrl(txid);
- }
- 
- function getSentTxidUrl(txid){      
-     return new Promise(resolve => {    
-         const sourceURL = `https://explorer.celo.org/tx/${txid}/token_transfers`;
-         resolve (tinyURL.shorten(sourceURL))        
-     });
- }
+}
+
+function getSentTxidUrl(txid){      
+    return new Promise(resolve => {    
+        const sourceURL = `https://explorer.celo.org/tx/${txid}/token_transfers`;
+        resolve (tinyURL.shorten(sourceURL))        
+    });
+}
  
  //GET ACCOUNT ADDRESS shortURL
  async function getAddressUrl(userAddress){
      return await getUserAddressUrl(userAddress);
  }
  
- function getUserAddressUrl(userAddress){
-   return new Promise(resolve => {    
-       const sourceURL = `https://explorer.celo.org/address/${userAddress}/tokens`;
-       resolve (tinyURL.shorten(sourceURL));
-     });   
- }
+function getUserAddressUrl(userAddress){
+  return new Promise(resolve => {    
+      const sourceURL = `https://explorer.celo.org/address/${userAddress}/tokens`;
+      resolve (tinyURL.shorten(sourceURL));
+    });   
+}
 
  function getPinFromUser(){
     return new Promise(resolve => {    
-      let loginpin = randomstring.generate({ length: 5, charset: 'numeric' });
+      let loginpin = randomstring.generate({ length: 4, charset: 'numeric' });
       resolve (loginpin);
     });
-  }
+}
 
-  function getEncryptKey(userMSISDN){    
-    const crypto = require('crypto');
-    const hash_fn = functions.config().env.algo.key_hash;
-    //console.log('Hash Fn',hash_fn);
-    let key = crypto.createHash(hash_fn).update(userMSISDN).digest('hex');
-    return key;
-  }
+function getEncryptKey(userMSISDN){    
+  const crypto = require('crypto');
+  const hash_fn = functions.config().env.algo.key_hash;
+  //console.log('Hash Fn',hash_fn);
+  let key = crypto.createHash(hash_fn).update(userMSISDN).digest('hex');
+  return key;
+}
+
+async function createcypher(text, userMSISDN, iv){
+  const crypto = require('crypto');
+  //console.log('cypher Phonenumber', userMSISDN);
+  let key = await getEncryptKey(userMSISDN);
+  const cipher = crypto.createCipher('aes192',  key, iv);
   
-  async function createcypher(text, userMSISDN, iv){
-    const crypto = require('crypto');
-    //console.log('cypher Phonenumber', userMSISDN);
-    let key = await getEncryptKey(userMSISDN);
-    const cipher = crypto.createCipher('aes192',  key, iv);
-    
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    //console.log(encrypted);
-    return encrypted; 
-  }
-    
-  async function decryptcypher(encrypted, userMSISDN, iv){    
-    const crypto = require('crypto');
-    let key = await getEncryptKey(userMSISDN);
-    //console.log('Decrypt key', key);
-    //console.log('IV', iv);
-    // const encrypted = cyphertext;
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  //console.log(encrypted);
+  return encrypted; 
+}
   
-    const decipher = crypto.createDecipher('aes192', key, iv);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    // console.log(decrypted);
-    return decrypted;
-  }
+async function decryptcypher(encrypted, userMSISDN, iv){    
+  const crypto = require('crypto');
+  let key = await getEncryptKey(userMSISDN);
+  //console.log('Decrypt key', key);
+  //console.log('IV', iv);
+  // const encrypted = cyphertext;
+
+  const decipher = crypto.createDecipher('aes192', key, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  // console.log(decrypted);
+  return decrypted;
+}
 
   // FUNCTIONS
 function sendMessage(to, message) {

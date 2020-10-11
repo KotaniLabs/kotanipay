@@ -44,207 +44,220 @@ async function transfercUSD(sender, receiver, amount, senderprivkey){
     // console.log('Sender Adress: ', sender);
     // console.log('Receiver Adress: ', receiver);
     let cUSDAmount = parseFloat(amount);  //Kes to CUSD Conversion 
-    cusdamount = cUSDAmount*0.01
+    //cusdamount = cUSDAmount
     // console.log('cUSD Amount: ', cusdamount);
-    return await sendcUSD(`${sender}`, `${receiver}`, cusdamount, `${senderprivkey}`);
+    return await sendcUSD(`${sender}`, `${receiver}`, cUSDAmount, `${senderprivkey}`);
   }
   catch(err){console.log(err)}
 } 
 
-  //CELOKIT FUNCTIONS
-  async function getPublicAddress(mnemonic){
-    // console.log('Getting your account Public Address:....')
-    let privateKey = await generatePrivKey(mnemonic);
-    return new Promise(resolve => { 
-       resolve (getAccAddress(getPublicKey(privateKey)));
-    });
-  }
-  
-  async function generatePrivKey(mnemonic){
-      return bip39.mnemonicToSeedHex(mnemonic).substr(0, 64);
-  }
-  
-  function getPublicKey(privateKey){
-      let privToPubKey = hexToBuffer(privateKey);
-      privToPubKey = privateToPublic(privToPubKey).toString('hex');
-      privToPubKey = ensureLeading0x(privToPubKey);
-      privToPubKey = toChecksumAddress(privToPubKey);
-      return privToPubKey;
-  }
-  
-  function getAccAddress(publicKey){
-      let pubKeyToAddress = hexToBuffer(publicKey);
-      pubKeyToAddress = pubToAddress(pubKeyToAddress).toString('hex');
-      pubKeyToAddress = ensureLeading0x(pubKeyToAddress);
-      pubKeyToAddress = toChecksumAddress(pubKeyToAddress)
-      return pubKeyToAddress;   
-  }
-
-  //0xe0c194103add2db24233f84e2ee7dd549fd79c39a0b23aa12b7b136a251ed304
-  async function getTxAmountFromHash(hash){
-    let _tx = await kit.web3.eth.getTransaction(hash);
-    let amount = await weiToDecimal(_tx.value);
-    console.log(amount);
-    return amount;
-  }
-
-  function checksumAddress(address){
-    let checksumAddress = toChecksumAddress(address)
-    return checksumAddress;   
-  }
-  
-  async function sendcGold(sender, receiver, amount, privatekey){
-      kit.addAccount(privatekey)
-      // const _amount = amount*1e+18    //kit.web3.utils.toWei(amount.toString(), 'ether')
-
-      const celotoken = await kit.contracts.getGoldToken()
-      const balance = await celotoken.balanceOf(sender)
-
-      let _balance = balance/1e+18;      //weiToDecimal(balance); 
-      console.log('CELO Balance: ',_balance)
-
-
-      //const oneGold = kit.web3.utils.toWei('1', 'ether')
-      _balance = parseFloat(_balance);
-      if(amount < _balance){
-        console.log(`${_balance} CELO balance is sufficient`);
-        let _amount = await decimaltoWei(amount);
-        const tx = await celotoken.transfer(receiver, _amount).send({ from: sender, });
-
-        const hash = await tx.getHash();
-        const receipt = await tx.waitReceipt();
-
-        console.log('CELO Transaction ID:..... ', JSON.stringify(hash));
-  
-        //let balance = await goldtoken.balanceOf(receiver)
-
-        return receipt;
-      }else{
-        console.log('Insufficient CELO Balance');
-        return 'failed';
-      }
-
-
-  
-      // let goldtoken = await kit.contracts.getGoldToken()
-      // let tx = await goldtoken.transfer(receiver, weiTransferAmount).send({from: sender})
-      // let receipt = await tx.waitReceipt()
-      // console.log('Transaction Details......................\n',JSON.stringify(receipt))
-
-  }
-
-  async function getTransactionBlock(txhash){
-    let _res = await kit.web3.eth.getTransaction(txhash)
-    return _res.blockNumber;
+//CELOKIT FUNCTIONS
+async function getPublicAddress(mnemonic){
+  // console.log('Getting your account Public Address:....')
+  let privateKey = await generatePrivKey(mnemonic);
+  return new Promise(resolve => { 
+      resolve (getAccAddress(getPublicKey(privateKey)));
+  });
 }
-  
-  async function weiToDecimal(value){
-      return kit.web3.utils.fromWei(value.toString(), 'ether'); //value/1e+18 
-  }
-  //console.log('W2D: ',weiToDecimal('10000000000000'))
 
-  async function decimaltoWei(value){
-      return kit.web3.utils.toWei(value.toString(), 'ether'); //value*1e+18    
-  }  
-  //console.log('D2W: ',decimaltoWei(25))
+async function generatePrivKey(mnemonic){
+    return bip39.mnemonicToSeedHex(mnemonic).substr(0, 64);
+}
 
-  async function sendcUSD(sender, receiver, amount, privatekey){        
-      const cusdtoken = await kit.contracts.getStableToken()
-      let cusdbalance = await cusdtoken.balanceOf(sender) // In cUSD
-      // console.log(`Raw Value balance: ${cusdbalance}`);
+function getPublicKey(privateKey){
+    let privToPubKey = hexToBuffer(privateKey);
+    privToPubKey = privateToPublic(privToPubKey).toString('hex');
+    privToPubKey = ensureLeading0x(privToPubKey);
+    privToPubKey = toChecksumAddress(privToPubKey);
+    return privToPubKey;
+}
 
-      let _balance = cusdbalance/1e+18;      //weiToDecimal(balance); 
-      console.log('USD Balance: ',_balance)
+function getAccAddress(publicKey){
+    let pubKeyToAddress = hexToBuffer(publicKey);
+    pubKeyToAddress = pubToAddress(pubKeyToAddress).toString('hex');
+    pubKeyToAddress = ensureLeading0x(pubKeyToAddress);
+    pubKeyToAddress = toChecksumAddress(pubKeyToAddress)
+    return pubKeyToAddress;   
+}
+
+//0xe0c194103add2db24233f84e2ee7dd549fd79c39a0b23aa12b7b136a251ed304
+async function getTxAmountFromHash(hash){
+  let _tx = await kit.web3.eth.getTransaction(hash);
+  let amount = await weiToDecimal(_tx.value);
+  console.log(amount);
+  return amount;
+}
+
+function checksumAddress(address){
+  let checksumAddress = toChecksumAddress(address)
+  return checksumAddress;   
+}
+
+async function sendcGold(sender, receiver, amount, privatekey){
+    kit.addAccount(privatekey)
+    // const _amount = amount*1e+18    //kit.web3.utils.toWei(amount.toString(), 'ether')
+
+    const celotoken = await kit.contracts.getGoldToken()
+    const balance = await celotoken.balanceOf(sender)
+
+    let _balance = balance/1e+18;      //weiToDecimal(balance); 
+    console.log('CELO Balance: ',_balance)
 
 
-      //const oneGold = kit.web3.utils.toWei('1', 'ether')
-      _balance = parseFloat(_balance);
-      if(amount < _balance){
-        kit.addAccount(privatekey)
-        console.log(`${_balance} USD balance is sufficient`);
-        let _amount = await decimaltoWei(amount);
-        const tx = await cusdtoken.transfer(receiver, _amount).send({ from: sender, });
+    //const oneGold = kit.web3.utils.toWei('1', 'ether')
+    _balance = parseFloat(_balance);
+    if(amount < _balance){
+      console.log(`${_balance} CELO balance is sufficient`);
+      let _amount = await decimaltoWei(amount);
+      const tx = await celotoken.transfer(receiver, _amount).send({ from: sender, });
 
-        const hash = await tx.getHash();
-        const receipt = await tx.waitReceipt();
+      const hash = await tx.getHash();
+      const receipt = await tx.waitReceipt();
 
-        console.log('USD Transaction ID:..... ', JSON.stringify(hash));
-  
-        //let balance = await goldtoken.balanceOf(receiver)
+      console.log('CELO Transaction ID:..... ', JSON.stringify(hash));
 
-        return receipt;
-      }else{
-        console.log('Insufficient CUSD Balance');
-        return 'failed';
-      }
+      //let balance = await goldtoken.balanceOf(receiver)
 
-      // // console.log(`Webkit: ${kit.web3.utils.fromWei(cusdbalance.toString(), 'ether')}`);
-      // let _senderbalance = await weiToDecimal(cusdbalance)      ///1e+18  //formated to decimal
-      // console.log('W2D Sender Balance: ', _senderbalance)
+      return receipt;
+    }else{
+      console.log('Insufficient CELO Balance');
+      return 'failed';
+    }
 
-      // if (amount < _senderbalance) {
-      //   console.info(`sender balance of ${_senderbalance} cUSD is sufficient to fulfill ${amount} cUSD`)
-  
-      //   kit.addAccount(privatekey)
-      //   // const stableTokenContract = await kit._web3Contracts.getStableToken()
-      //   //const oneGold = kit.web3.utils.toWei('1', 'ether')
-      //   // const gasPriceMinimumContract = await kit.contracts.getGasPriceMinimum()
-      //   // const gasPriceMinimum = await gasPriceMinimumContract.getGasPriceMinimum(cusdtoken)
-      //   // const gasPrice = Math.ceil(gasPriceMinimum * 1.3) // Wiggle room if gas price minimum changes before tx is sent
-      //   // contractkit.setFeeCurrency(CeloContract.StableToken) // Default to paying fees in cUSD
-      //   let _amount = await decimaltoWei(amount)
 
-      //   const tx = await cusdtoken.transfer(receiver, _amount).send({ from: sender, })
-      
-      //   const hash = await tx.getHash()
-      //   const receipt = await tx.waitReceipt()
 
-      //   // const txo = await stableTokenContract.methods.transfer(receiver, weiTransferAmount)
-      //   // const tx = await kit.sendTransactionObject(txo, { from: sender })
-      //   // console.info(`Sent tx object`)
-      //   // const hash = await tx.getHash()
-      //   // const receipt = await tx.waitReceipt()
-      //   console.info(`Transferred ${amount} dollars to ${receiver}. Hash: ${hash}`)
-      //   return receipt
-      // }else{        
-      //     console.error(`Not enough funds in sender balance to fulfill request: ${amount} > ${_senderbalance}`)
-      //     return 0
-      // }
-  }
+    // let goldtoken = await kit.contracts.getGoldToken()
+    // let tx = await goldtoken.transfer(receiver, weiTransferAmount).send({from: sender})
+    // let receipt = await tx.waitReceipt()
+    // console.log('Transaction Details......................\n',JSON.stringify(receipt))
 
-  async function usd2celoSwap(myAddress, amount){
-    const cusd = await this.contracts.getStableToken()
-    const exchange = await this.contracts.getExchange()
+}
+
+async function getTransactionBlock(txhash){
+  let _res = await kit.web3.eth.getTransaction(txhash)
+  return _res.blockNumber;
+}
+
+async function weiToDecimal(value){
+    return kit.web3.utils.fromWei(value.toString(), 'ether'); //value/1e+18 
+}
+//console.log('W2D: ',weiToDecimal('10000000000000'))
+
+async function decimaltoWei(value){
+    return kit.web3.utils.toWei(value.toString(), 'ether'); //value*1e+18    
+}  
+//console.log('D2W: ',decimaltoWei(25))
+
+async function sendcUSD(sender, receiver, amount, privatekey){        
+    const cusdtoken = await kit.contracts.getStableToken()
+    let cusdbalance = await cusdtoken.balanceOf(sender) // In cUSD
+    // console.log(`Raw Value balance: ${cusdbalance}`);
+
+    let _balance = cusdbalance/1e+18;      //weiToDecimal(balance); 
+    console.log('USD Balance: ',_balance)
+
+
+    //const oneGold = kit.web3.utils.toWei('1', 'ether')
+    _balance = parseFloat(_balance);
+    if(amount < _balance){
+      kit.addAccount(privatekey)
+      console.log(`${_balance} USD balance is sufficient to fulfil ${amount}`);
+      let _amount = await decimaltoWei(amount);
+      const tx = await cusdtoken.transfer(receiver, _amount).send({ from: sender, });
+
+      const hash = await tx.getHash();
+      const receipt = await tx.waitReceipt();
+
+      console.log('USD Transaction ID:..... ', JSON.stringify(hash));
+
+      //let balance = await goldtoken.balanceOf(receiver)
+
+      return receipt;
+    }else{
+      console.log('Insufficient CUSD Balance');
+      return 'failed';
+    }
+
+    // // console.log(`Webkit: ${kit.web3.utils.fromWei(cusdbalance.toString(), 'ether')}`);
+    // let _senderbalance = await weiToDecimal(cusdbalance)      ///1e+18  //formated to decimal
+    // console.log('W2D Sender Balance: ', _senderbalance)
+
+    // if (amount < _senderbalance) {
+    //   console.info(`sender balance of ${_senderbalance} cUSD is sufficient to fulfill ${amount} cUSD`)
+
+    //   kit.addAccount(privatekey)
+    //   // const stableTokenContract = await kit._web3Contracts.getStableToken()
+    //   //const oneGold = kit.web3.utils.toWei('1', 'ether')
+    //   // const gasPriceMinimumContract = await kit.contracts.getGasPriceMinimum()
+    //   // const gasPriceMinimum = await gasPriceMinimumContract.getGasPriceMinimum(cusdtoken)
+    //   // const gasPrice = Math.ceil(gasPriceMinimum * 1.3) // Wiggle room if gas price minimum changes before tx is sent
+    //   // contractkit.setFeeCurrency(CeloContract.StableToken) // Default to paying fees in cUSD
+    //   let _amount = await decimaltoWei(amount)
+
+    //   const tx = await cusdtoken.transfer(receiver, _amount).send({ from: sender, })
     
-    const cusdbalance = await cusd.balanceOf(myAddress)
-    
-    const approveTx = await cusd.approve(exchange.address, cusdbalance).send()
-    const approveReceipt = await approveTx.waitReceipt()
-    
-    const celoAmount = await exchange.quoteUsdSell(cusdbalance)
+    //   const hash = await tx.getHash()
+    //   const receipt = await tx.waitReceipt()
 
-    const sellTx = await exchange.sellDollar(cusdbalance, celoAmount).send()
-    const sellReceipt = await sellTx.waitReceipt()
-  }
+    //   // const txo = await stableTokenContract.methods.transfer(receiver, weiTransferAmount)
+    //   // const tx = await kit.sendTransactionObject(txo, { from: sender })
+    //   // console.info(`Sent tx object`)
+    //   // const hash = await tx.getHash()
+    //   // const receipt = await tx.waitReceipt()
+    //   console.info(`Transferred ${amount} dollars to ${receiver}. Hash: ${hash}`)
+    //   return receipt
+    // }else{        
+    //     console.error(`Not enough funds in sender balance to fulfill request: ${amount} > ${_senderbalance}`)
+    //     return 0
+    // }
+}
 
-  async function celo2usdSwap(amount){
-    const favorableCUSDAmount = 2.05
-    const amountToExchange = decimaltoWei('10')
-    const oneGold = decimaltoWei('1')
-    const exchange = await kit.contracts.getExchange()
+async function buyCelo(address, cusdAmount, privatekey){
+  kit.setFeeCurrency(contractkit.CeloContract.StableToken);
+  kit.addAccount(privatekey)
 
-    const amountOfcUsd = await exchange.quoteGoldSell(oneGold)
+  const cusdtoken = await kit.contracts.getStableToken()
+  const exchange = await kit.contracts.getExchange()
 
-    if (amountOfcUsd > favorableCUSDAmount) {
-      const goldToken = await kit.contracts.getGoldToken()
-      const approveTx = await goldToken.approve(exchange.address, amountToExchange).send()
-      const approveReceipt = await approveTx.waitReceipt()
+  cusdbalance = `${await cusdtoken.balanceOf(address)}`
+  console.log(`CUSD Balance: ${kit.web3.utils.fromWei(cusdbalance)}`)
 
-      const usdAmount = await exchange.quoteGoldSell(amountToExchange)
-      const sellTx = await exchange.sellGold(amountToExchange, usdAmount).send()
-      const sellReceipt = await sellTx.waitReceipt()
-    }    
-  }
+  const tx = await cusdtoken.approve(exchange.address, cusdAmount).send({ from: address, })
+  // console.log(tx)
+  const receipt = await tx.waitReceipt()
+  // console.log(receipt)
+
+  const celoAmount = `${await exchange.quoteUsdSell(cusdAmount)}`
+  console.log(`You will receive ${kit.web3.utils.fromWei(celoAmount)} CELO`)
+  const buyCeloTx = await exchange.sellDollar(cusdAmount, celoAmount).send({ from: address, })
+  const buyCeloReceipt = await buyCeloTx.waitReceipt()
+  console.log(buyCeloReceipt)
+}
+
+async function sellCelo(address, celoAmount, privatekey){
+  kit.setFeeCurrency(contractkit.CeloContract.StableToken);
+  kit.addAccount(privatekey)
+  // const _amount = amount*1e+18    //kit.web3.utils.toWei(amount.toString(), 'ether')
+
+  const celotoken = await kit.contracts.getGoldToken()
+  const cusdtoken = await kit.contracts.getStableToken()
+  const exchange = await kit.contracts.getExchange()
+  
+  const celobalance = `${await celotoken.balanceOf(address)}`
+  console.log(`CELO Balance: ${kit.web3.utils.fromWei(celobalance)}`)
+
+  const tx = await celotoken.approve(exchange.address, celoAmount).send({ from: address, })
+  // console.log(tx)
+  const receipt = await tx.waitReceipt()
+  // console.log(receipt)
+
+  const cusdAmount = `${await exchange.quoteGoldSell(celoAmount)}`
+  console.log(`You will receive ${kit.web3.utils.fromWei(cusdAmount)} CUSD`)
+  const sellCeloTx = await exchange.sellGold(celoAmount, cusdAmount).send({ from: address, })
+  const sellCeloReceipt = await sellCeloTx.waitReceipt()
+  console.log(sellCeloReceipt)
+  //}
+}
   // getLatestBlock().then(_res=>console.log(_res.number))
   //working
   async function getLatestBlock() {
@@ -306,6 +319,8 @@ async function transfercUSD(sender, receiver, amount, senderprivkey){
     decimaltoWei,
     getContractKit,
     sendcUSD,
+    buyCelo,
+    sellCelo,
     getLatestBlock,
     validateWithdrawHash
  }
