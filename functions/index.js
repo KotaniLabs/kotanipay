@@ -3,9 +3,7 @@
 // Firebase init
  const functions = require('firebase-functions');
  const admin = require('firebase-admin');
-
  //const firebase-admin = require('firebase-admin');
-
  const serviceAccount = require("./config/serviceAccountKey.json");
 
  admin.initializeApp({
@@ -91,7 +89,6 @@ const iv = functions.config().env.crypto_iv.key;
 //@task imports from celokit
 
 const { transfercGOLD,
-        transfercUSD,
         getPublicAddress,
         generatePrivKey,
         getPublicKey,
@@ -134,9 +131,11 @@ const kit = getContractKit();
    let lastname = '';
    let dateofbirth = '';
    let email = '';
-   let usdMarketRate = 107.5;
+   let usdMarketRate = 108.5;
    let cusd2kesRate = 108.6 - (0.01*108.6);  //usdMarketRate - (0.01*usdMarketRate);
-   let kes2UsdRate = 1/(108.6 + (0.02*108.6));  //usdMarketRate + (0.02*usdMarketRate);
+   let kes2UsdRate = 0.0092165;  //usdMarketRate + (0.02*usdMarketRate)=1/(108.6 + (0.02*108.6))usdMarketRate
+   let cusdSellRate = 110;
+   let cusdBuyRate = 107.5;
    
    // let text = '';
   // var data = [];
@@ -296,6 +295,8 @@ app.post("/", async (req, res) => {
 
     receiverMSISDN = receiverMSISDN.substring(1);       
     amount = data[2];
+    let cusdAmount = parseFloat(amount);
+    cusdAmount = cusdAmount*0.0092165;
     senderId = await getSenderId(senderMSISDN)
     console.log('senderId: ', senderId);
     recipientId = await getRecipientId(receiverMSISDN)
@@ -336,7 +337,7 @@ app.post("/", async (req, res) => {
     let _receiver = '';
     
 
-    let receipt = await transfercUSD(senderInfo.data().publicAddress, receiverInfo.data().publicAddress, amount, senderprivkey);
+    let receipt = await sendcUSD(senderInfo.data().publicAddress, receiverInfo.data().publicAddress, cusdAmount, senderprivkey);
     if(receipt === 'failed'){
       msg = `END Your transaction has failed due to insufficient balance`;  
       res.send(msg); 
@@ -382,97 +383,108 @@ app.post("/", async (req, res) => {
     msg += `CON Enter your PIN:`;
     msg += footer;
     res.send(msg);
-   }else if ( data[0] == '3' && data[1]!== '' && data[2]!== '') {  //  WITHDRAW && AMOUNT && FULLNAME
+   }else if ( data[0] == '3' && data[1]!== '' && data[2]!== '') {  //  WITHDRAW && AMOUNT && FULLNAME 
     let withdrawMSISDN = phoneNumber.substring(1);  // phoneNumber to send sms notifications
     // console.log('Phonenumber: ', withdrawMSISDN); 
-    let kesAmount = data[1];
-    console.log('Amount to Withdraw: KES.', kesAmount); 
+    let kesAmountToReceive = data[1];
+    //let cusdBuyRate = 0.009107;
+    console.log('Amount to Withdraw: KES.', kesAmountToReceive); 
     let access_pin =  `${data[2]}`;
     let displayName = '';
-    // msg += `END Thank you..Processing your transaction:`;
-    let _kesAmount = number_format(kesAmount, 2);
-
+    let _kesAmountToReceive = number_format(kesAmountToReceive, 2);
     withdrawId = await getSenderId(withdrawMSISDN);
-    console.log('withdrawId: ', withdrawId);
-    // if(withdrawId==='745ae6b3d37c6bfc3c310214ce5ea804d1ccc6cc'){admin.auth().setCustomUserClaims('1c9724f4f6420de3a93dbc87f3472f94fd863b1d', {verifieduser: true})}
-    
+
     let saved_access_pin = await getLoginPin(withdrawId); 
-    // console.log('Access PIN: ', saved_access_pin)
     let _access_pin = await createcypher(access_pin, withdrawMSISDN, iv);
-    // console.log('User supplied Access PIN: ', _access_pin)
-    // msg += `END Processing your transaction:`; 
 
     if(_access_pin === saved_access_pin){
       let senderInfo = await getSenderDetails(withdrawId);
-
       // @todo: verify that user has enough balance
-      let userbalance = await getWithdrawerBalance(senderInfo.data().publicAddress); 
-      console.log(`${withdrawMSISDN} balance: ${userbalance*usdMarketRate} KES`);
-      let _cusdAmount = _kesAmount*kes2UsdRate; //User receives
-      
-      // _cusdAmount = number_format(`${_kesAmount/usdMarketRate}`, 2); //@todo Add the 1% withdraw fee
-      console.log(`Amount: ${_cusdAmount}`);
-      if((_cusdAmount+(0.01*_cusdAmount)) < userbalance){
+      let usercusdbalance = await getWithdrawerBalance(senderInfo.data().publicAddress); 
+      let userkesbalance = usercusdbalance*usdMarketRate
+      console.log(`${withdrawMSISDN} balance: ${usercusdbalance} CUSD`);
+      let _kesAmountToEscrow = _kesAmountToReceive*1.02
+      let _cusdAmountToEScrow = _kesAmountToEscrow*kes2UsdRate; 
+      console.log(`Amount to Escrow: ${_cusdAmountToEScrow} CUSD`);
+      if(_cusdAmountToEScrow < usercusdbalance){
         let jengabalance = await jenga.getBalance();
-        console.log(`Jenga Balance: KES ${jengabalance.balances[0].amount}`);                
+        console.log(`Jenga Balance: KES ${jengabalance.balances[0].amount}`); 
+        let jengaFloatAmount = number_format(jengabalance.balances[0].amount, 2)               
 
-        if(jengabalance.balances[0].amount>_kesAmount){
+        if(_kesAmountToReceive<jengaFloatAmount){
           msg = `END Thank you. \nWe're processing your transaction:`;
           res.send(msg);
           // console.log(`USSD: Thank you. Were processing your transaction:`);
 
           await admin.auth().getUser(withdrawId).then(user => { displayName = user.displayName; return; }).catch(e => {console.log(e)}) 
-          console.log('Withdrawer fullName: ', displayName);        
+          console.log('Withdrawer fullName: ', displayName, 'withdrawId: ',withdrawId);        
           
           // const escrowMSISDN = functions.config().env.escrow.msisdn;
           escrowId = await getRecipientId(escrowMSISDN);
           let escrowInfo = await getReceiverDetails(escrowId);
 
           let senderprivkey = await getSenderPrivateKey(senderInfo.data().seedKey, withdrawMSISDN, iv)
-          let txreceipt = await transfercUSD(senderInfo.data().publicAddress, escrowInfo.data().publicAddress, `${_cusdAmount+(0.01*_cusdAmount)}`, senderprivkey);
+          let txreceipt = await sendcUSD(senderInfo.data().publicAddress, escrowInfo.data().publicAddress, `${_cusdAmountToEScrow}`, senderprivkey);
           console.log(withdrawMSISDN,': withdraw tx receipt: ', JSON.stringify(txreceipt));
-          // mpesa2customer(withdrawMSISDN, data[1])    //calling mpesakit library
-          if(txreceipt.transactionHash !== null || txreceipt.transactionHash !== undefined || txreceipt !== 'failed'){
-            // msg = `END Thank you. \nWe're processing your transaction:`;
-            // res.send(msg);
-            console.log(`USSD: Thank you. Were processing your transaction:`);
-            // msg = `END You have withdrawn KES: ${kesAmount} from your Celo account.`;
+          if(txreceipt.transactionHash !== null && txreceipt.transactionHash !== undefined && txreceipt !== 'failed'){
             console.log('436: Tx Hash: ', JSON.stringify(txreceipt.transactionHash));
 
             let currencyCode = 'KES';
             let countryCode = 'KE';
             let recipientName = `${displayName}`;
             let mobileNumber = '';
+            //let withdrawToMpesa;
             try {
               const number = phoneUtil.parseAndKeepRawInput(`${withdrawMSISDN}`, 'KE');
               mobileNumber = '0'+number.getNationalNumber();
             } catch (error) { console.log(error); }
-            console.log('Withdrawer MobileNumber', mobileNumber);
-
-            let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(kesAmount, currencyCode, countryCode, recipientName, mobileNumber);
-            console.log('Sending From Jenga to Mpesa Status => ', JSON.stringify(withdrawToMpesa.status));
+            console.log('Withdrawer MobileNumber', mobileNumber, 'Amount:', kesAmountToReceive);
+            // try{
+            let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(kesAmountToReceive, currencyCode, countryCode, recipientName, mobileNumber)
+            console.log('Sending From Jenga to Mpesa status => ',withdrawToMpesa.status)
+              // console.log('Sending From Jenga to Mpesa Status => ', JSON.stringify(withdrawToMpesa.status));
+            // }catch(e){console.log('Error: Unable to process index.js ln_445')}
+            // jenga.sendFromJengaToMobileMoney(kesAmountToReceive, currencyCode, countryCode, recipientName, mobileNumber)
+            // .then(res => {
+            //   console.log('Sending From Jenga to Mpesa => \n',res);
+            //   withdrawToMpesa = res;
+            //   return;
+            // })
+            // .catch(e=>{console.log('Unable to process\n',e.response)})
+            
             if(withdrawToMpesa.status === "SUCCESS"){
               let JengaTxDetails = {
                 "recipientNumber" : `${mobileNumber}`,
                 "recipientName" : `${displayName}`,
-                "amount" : `${kesAmount}`,
-                "withdrawId" : withdrawId
+                "amount" : `${_kesAmountToReceive}`,
+                "withdrawId" : withdrawId,
+                "date" : new Date().toLocaleString()
               }
               await logJengaProcessedTransaction(txreceipt.transactionHash, JengaTxDetails);
-            }
-            // jenga.sendFromJengaToMobileMoney(data[1], 'KES', 'KE',`${fullname}`, withdrawMSISDN) 
-            let message2receiver = `You have Withdrawn KES ${kesAmount} from your Celo Account.`;
-            sendMessage("+"+withdrawMSISDN, message2receiver); 
+              // jenga.sendFromJengaToMobileMoney(data[1], 'KES', 'KE',`${fullname}`, withdrawMSISDN) 
+              let message2receiver = `You have Withdrawn KES ${_kesAmountToReceive} from your Celo Account.`;
+              sendMessage("+"+withdrawMSISDN, message2receiver); 
+            } else{
+              console.log(`+${withdrawMSISDN} withdrawal of amount ${_kesAmountToReceive} has failed: txhash: ${txreceipt.transactionHash}`)
+              let failedTxDetails = {
+                "recipientNumber" : `${mobileNumber}`,
+                "recipientName" : `${displayName}`,
+                "amount" : `${_kesAmountToReceive}`,
+                "withdrawId" : withdrawId,
+                "date" : new Date().toLocaleString()
+              }
+              await logJengaFailedTransaction(txreceipt.transactionHash, failedTxDetails);
+            }           
           }else{  
             let message2receiver = `Sorry your Transaction could not be processed. \nTry again later.`;
-            sendMessage("+"+withdrawMSISDN, message2receiver);           
+            sendMessage("+"+withdrawMSISDN, message2receiver);
           }
         }else{
           msg = `END Sorry. \nWithdraw limit exceeded.\n Max Amount KES: ${jengabalance.balances[0].amount}`;
           res.send(msg);
         }
       }else{
-        msg = `CON You have insufficient funds to withdraw KES: ${kesAmount} from your Celo account.`;        //+phoneNumber.substring(1)
+        msg = `CON You have insufficient funds to withdraw KES: ${_kesAmountToReceive} from your Celo account.\n Max Withdraw amount is KES: ${userkesbalance-(0.02*userkesbalance)}`;        //+phoneNumber.substring(1)
         res.send(msg);
       } 
     }else{
@@ -511,7 +523,8 @@ app.post("/", async (req, res) => {
     let userMSISDN = phoneNumber.substring(1); 
     let amount2spend = number_format(data[2],2);
     let celoKesPrice = 200;  
-    let celoUnits = amount2spend/celoKesPrice   
+    let celoUnits = amount2spend/celoKesPrice;
+    // buyCelo(address, cusdAmount, privatekey)
     msg = `END Purchasing ${number_format(celoUnits,2)} CELO at Ksh. ${celoKesPrice} per Unit `;    //await getAccDetails(userMSISDN);   
     // msg += footer;  
     res.send(msg);   
@@ -527,7 +540,8 @@ app.post("/", async (req, res) => {
     let userMSISDN = phoneNumber.substring(1); 
     let celoUnits = number_format(data[2],2);
     let celoKesPrice = 200;  
-    let amount2receive = celoUnits*celoKesPrice   
+    let amount2receive = celoUnits*celoKesPrice;
+    // sellCelo(address, celoAmount, privatekey)   
     msg = `END Selling ${number_format(celoUnits,2)} CELO at Ksh. ${celoKesPrice} per Unit `;    //await getAccDetails(userMSISDN);   
     // msg += footer;  
     res.send(msg);   
@@ -756,6 +770,7 @@ restapi.post('/jwt', async(req, res) => {
 //parameters: {"phoneNumber" : "E.164 number" , "amount" : "value"}
 restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
   //console.log('Token: ', req.token)
+  console.log("Received request for: " + req.url);
   let userMSISDN = req.body.phoneNumber;
   try {
     const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
@@ -789,6 +804,7 @@ restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
 //parameter: {"phoneNumber" : "E.164 number" }
 restapi.post('/getbalance', async (req, res) => {
   let userMSISDN = req.body.phoneNumber;
+  console.log("Received request for: " + req.url);
   try {
     const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
     userMSISDN = phoneUtil.format(recnumber, PNF.E164);
@@ -837,6 +853,7 @@ restapi.post('/getbalance', async (req, res) => {
 //parameter: {"phoneNumber" : "E.164 number" }
 restapi.post('/transactions', async (req, res) => { 
   let userMSISDN = req.body.phoneNumber;
+  console.log("Received request for: " + req.url);
   // let amount = request.body.amount;
   try {
     const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
@@ -871,6 +888,7 @@ restapi.post('/transactions', async (req, res) => {
 });
 
 restapi.post("/getkotanipayescrow", async (req, res) => { 
+  console.log("Received request for: " + req.url);
   let escrowId  = await getSenderId(escrowMSISDN);
   let escrowInfo = await getSenderDetails(escrowId);
   console.log('User Address => ', escrowInfo.data().publicAddress);
@@ -881,7 +899,7 @@ restapi.post("/getkotanipayescrow", async (req, res) => {
   let message = {
     "kotanipayEscrowAddress": `${escrowInfo.data().publicAddress}`,
     "conversionRate" : { "cusdToKes" : `${cusd2kesRate}` },
-    "maxWithdrawAmount" : `CUSD ${number_format(`${jengabalance.balances[0].amount/usdMarketRate}`, 2)}`
+    "maxWithdrawAmount" : `CUSD ${number_format(`${jengabalance.balances[0].amount*kes2UsdRate}`, 2)}`
   };
 
   res.json(message);
@@ -889,6 +907,7 @@ restapi.post("/getkotanipayescrow", async (req, res) => {
 
 //parameters: {"phoneNumber" : "E.164 number" , "amount" : "value", "txhash" : "value"}
 restapi.post("/withdraw", async (req, res) => {
+  console.log("Received request for: " + req.url);
   let userMSISDN = req.body.phoneNumber;
   let txhash = req.body.txhash;
   try {
@@ -965,17 +984,19 @@ restapi.post("/withdraw", async (req, res) => {
                   "blockNumber" : txdetails.txblock,
                   "value" : `${txdetails.value} CUSD`,
                   "from" : txdetails.from,
-                  "to" : txdetails.to
+                  "to" : txdetails.to,
+                  "date" : new Date().toLocaleString()
                 }
-                let amount = number_format(txdetails.value, 4)
-                amount =  amount*kes2UsdRate;
-                console.log(`Withdraw Amount KES: ${amount}`);
+                let _cusdAmount = number_format(txdetails.value, 4)
+                let cusdWithdrawRate = usdMarketRate*0.98;
+                let kesAmountToReceive =  _cusdAmount*cusdWithdrawRate;
+                console.log(`Withdraw Amount KES: ${kesAmountToReceive}`);
                 let jengabalance = await jenga.getBalance();
                 console.log(`Jenga Balance: KES ${jengabalance.balances[0].amount}`);                
 
-                if(jengabalance.balances[0].amount>amount){
+                if(jengabalance.balances[0].amount>kesAmountToReceive){
                   console.log(txhash, ' Transaction processing successful')
-                  let jengaResponse = await processApiWithdraw(userMSISDN, amount);
+                  let jengaResponse = await processApiWithdraw(userMSISDN, kesAmountToReceive);
                   await setProcessedTransaction(txhash, withdrawDetails)
                   console.log(txhash, ' Transaction processing successful')
                   res.json({
@@ -1033,6 +1054,7 @@ restapi.post("/withdraw", async (req, res) => {
 });
 
 restapi.post('/jengakyc', async (req, res) => {
+  console.log("Received request for: " + req.url);
   // const { body: { phoneNumber: phoneNumber } } = req;
   // const { body: { documentType: documentType } } = req;
   // const { body: { documentNumber: documentNumber } } = req;
@@ -1174,75 +1196,94 @@ restapi.post('/jengakyc', async (req, res) => {
 });
 
 restapi.post('/kyc', async (req, res) => {
-  // const { body: { phoneNumber: phoneNumber } } = req;
-  // const { body: { documentType: documentType } } = req;
-  // const { body: { documentNumber: documentNumber } } = req;
-  // const { body: { firstname: firstname } } = req;
-  // const { body: { lastname: lastname } } = req;
-  // const { body: { dateofbirth: dateofbirth } } = req;
-  // const { body: { email: email } } = req;
-  const phoneNumber = req.body.phoneNumber;
-  let documentType = req.body.documentType;
-  let documentNumber = req.body.documentNumber;
-  let firstname = req.body.firstname;
-  let lastname = req.body.lastname;
-  let dateofbirth = req.body.dateofbirth;
-  let email = req.body.email;
+  try{
+    console.log("Received request for: " + req.url);
+    // const { body: { phoneNumber: phoneNumber } } = req;
+    // const { body: { documentType: documentType } } = req;
+    // const { body: { documentNumber: documentNumber } } = req;
+    // const { body: { firstname: firstname } } = req;
+    // const { body: { lastname: lastname } } = req;
+    // const { body: { dateofbirth: dateofbirth } } = req;
+    // const { body: { email: email } } = req;
+    const phoneNumber = req.body.phoneNumber;
+    let documentType = req.body.documentType;
+    let documentNumber = req.body.documentNumber;
+    let firstname = req.body.firstname;
+    let lastname = req.body.lastname;
+    let dateofbirth = req.body.dateofbirth;
+    let email = req.body.email;
 
-  let userMSISDN = ''; 
+    let userMSISDN = ''; 
 
-  try {
-    const recnumber = phoneUtil.parseAndKeepRawInput(`${phoneNumber}`, 'KE');
-    userMSISDN = phoneUtil.format(recnumber, PNF.E164);
-  } catch (err) { console.log(err); }
-  userMSISDN = userMSISDN.substring(1);
-  
-  console.log('userMSISDN: ', userMSISDN)
-  let userId  = await getSenderId(userMSISDN)
-  console.log('UserId: ', userId)
+    try {
+      const recnumber = phoneUtil.parseAndKeepRawInput(`${phoneNumber}`, 'KE');
+      userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+    } catch (err) { console.log(err); }
+    userMSISDN = userMSISDN.substring(1);
+    // console.log(`Validated Number: ${validatedNumber}`);
+    
+    console.log('userMSISDN: ', userMSISDN)
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
 
-  let newUserPin = await getPinFromUser();
-  console.log('newUserPin', newUserPin)
-  let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+    let newUserPin = await getPinFromUser();
+    console.log('newUserPin', newUserPin)
+    let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
 
-  console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+    console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
 
 
-  let userstatusresult = await checkIfSenderExists(userId);
-  console.log("User Exists? ",userstatusresult);
-  if(userstatusresult == false){ await addUserDataToDB(userId, userMSISDN); console.log('creating user acoount');  } 
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    // if(userstatusresult == false){ await addUserDataToDB(userId, userMSISDN); console.log('creating user acoount');  } 
+    if(userstatusresult == false){ 
+      // await addUserDataToDB(userId, userMSISDN); console.log('creating user acoount');  
+      let message = {       
+        "status": `error`, 
+        "phoneNumber" : `${userMSISDN}`,
+        "Details": `The user account cannot be created from the KYC API`   
+      };    
+      res.json(message);  
+    } 
 
-  let isKyced = await checkisUserKyced(userId);
-   //If Already KYC'd
-  if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
-  else{  //NOT KYC'd
-    let kycData = {
-      "documentType" : documentType,
-      "documentNumber" : documentNumber,
-      "dateofbirth" : dateofbirth,
-      "fullName" : `${firstname} ${lastname}`
+    let isKyced = await checkisUserKyced(userId);
+    //If Already KYC'd
+    if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
+    else{  //NOT KYC'd
+      let kycData = {
+        "documentType" : documentType,
+        "documentNumber" : documentNumber,
+        "dateofbirth" : dateofbirth,
+        "fullName" : `${firstname} ${lastname}`
+      }
+
+      //Update User account and enable
+      let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
+
+      await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+
+      // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
+      //save KYC data to KYC DB
+      let newkycdata = await addUserKycToDB(userId, kycData);
+      let message = {       
+        "status": `success`, 
+        "Details": `KYC completed successfully`   
+      };    
+      res.json(message);    
     }
-
-    //Update User account and enable
-    let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
-
-    await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
-
-    // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
-    //save KYC data to KYC DB
-    let newkycdata = await addUserKycToDB(userId, kycData);
-
+  }catch(e){
     let message = {       
-      "status": `success`, 
-      "Details": `KYC completed successfully`   
-    };
-  
-    res.json(message);    
+      "status": `error`, 
+      "Details": `Invalid PhoneNumber Supplied`,
+      "comment": `Used a valid kenyan PhoneNumber`   
+    };  
+    res.json(message);  
   }
 });
 
 //parameters: {celloAddress, phoneNumber, amount} 
 restapi.post("/depositfunds", async (req, res) => { 
+  console.log("Received request for: " + req.url);
   const data = req.body;
   console.log('B2C Data: ',data);
   res.send(`Funds deposit coming soon: ${data}`); 
@@ -1280,7 +1321,7 @@ async function processApiWithdraw(withdrawMSISDN, amount){
     console.log('Sending From Jenga to Mpesa Status => ', JSON.stringify(withdrawToMpesa.status));
 
     // jenga.sendFromJengaToMobileMoney(data[1], 'KES', 'KE',`${fullname}`, withdrawMSISDN) 
-    let message2receiver = `You have Withdrawn KES ${amount} to your Mpesa account.`;
+    let message2receiver = `You have Withdrawn KES ${number_format(amount,2)} to your Mpesa account.`;
     sendMessage("+"+withdrawMSISDN, message2receiver);  
 
     let message = {
@@ -1341,6 +1382,14 @@ async function logJengaProcessedTransaction(txid, txdetails){
   } catch (err) { console.log(err) }
 }
 
+async function logJengaFailedTransaction(txid, txdetails){
+  try {
+    let db = firestore.collection('jengaFailedWithdraws').doc(txid);
+    db.set(txdetails).then(newDoc => {console.log("Jenga Failed Transaction logged: => ", newDoc.id)})
+    
+  } catch (err) { console.log(err) }
+}
+
 async function checkIfUserAccountExist(userId, userMSISDN){
   let userExists = await checkIfSenderExists(userId);
   if(userExists === false){         
@@ -1365,21 +1414,14 @@ async function checkIsUserVerified(senderId){
 //JENGA CALLBACK API
 jengaApi.post("/", async (req, res) => {
   let data = req.body
-  //data = data.JSON
-  // console.log(JSON.stringify(data));
-  // console.log('Transaction Details: \nTx Info: ',data.transaction.additionalInfo);
-  // console.log('billNumber: ',data.transaction.billNumber);
-  // console.log('orderAmount: ',data.transaction.amount);
-  // console.log('reference: ',data.transaction.reference);
+
   if(data.bank.transactionType === "C"){
-
-    console.log('Deposit details: ',JSON.stringify(data));
-
-    console.log('Deposit Transaction Details: ',data.transaction.additionalInfo);
+    console.log('Deposit Transaction Details: ',data.transaction.additionalInfo,' Amount: ' ,data.transaction.amount);
     let depositAditionalInfo = data.transaction.additionalInfo;
-    let amount = data.transaction.amount;
-    let _cusdAmount = number_format(amount, 2);
-    _cusdAmount = _cusdAmount/usdMarketRate;  //@task kesto USD conversion
+    let kesAmountDeposited = data.transaction.amount;
+    let _kesAmountDeposited = number_format(kesAmountDeposited, 2);
+    let _cusdAmountDeposited = _kesAmountDeposited*usdMarketRate;  //@task kesto USD conversion
+    let cusdAmountCredited = _cusdAmountDeposited*0.98;
 
     var depositDetails = depositAditionalInfo.split('/');
     //console.log('Depositor PhoneNumber: ',depositDetails[1]);
@@ -1387,11 +1429,8 @@ jengaApi.post("/", async (req, res) => {
 
     //DEPOSIT VIA EQUITY PAYBILL or TILL NUMBER
     const escrowMSISDN = functions.config().env.escrow.msisdn;
-    let escrowId = await getRecipientId(escrowMSISDN);
-    // console.log('escrowId: ', escrowId);
-  
-    let depositId = await getSenderId(depositMSISDN)
-    // console.log('depositId: ', depositId);
+    const escrowId = await getRecipientId(escrowMSISDN);  
+    const depositId = await getSenderId(depositMSISDN)
 
     await admin.auth().getUser(depositId)
     .then(user => {
@@ -1405,13 +1444,10 @@ jengaApi.post("/", async (req, res) => {
     let depositInfo = await getSenderDetails(depositId);
     // console.log('Sender Info: ', JSON.stringify(depositInfo.data()))
     //let senderprivkey = await getSenderPrivateKey(depositInfo.data().seedKey, depositMSISDN, iv)
-
     let escrowInfo = await getReceiverDetails(escrowId);
-    let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv)
+    let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv)  
 
-  
-
-    let receipt = await transfercUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, `${_cusdAmount}`, escrowprivkey);
+    let receipt = await sendcUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, `${cusdAmountCredited}`, escrowprivkey);
     let url = await getTxidUrl(receipt.transactionHash);
     let message2depositor = `You have deposited KES ${amount} to your Celo Account.\nReference: ${data.transaction.billNumber}\nTransaction Link:  ${url}`;
     console.log('tx URL', url);
@@ -1433,16 +1469,8 @@ jengaApi.post("/", async (req, res) => {
 
 jengaApi.post("/deposit", async (req, res) => {
   let data = req.body
-  //data = data.JSON
-  console.log(JSON.stringify(data));
-  console.log('Transaction Details: \nTx Info: ',data.transaction.additionalInfo);
-  // console.log('billNumber: ',data.transaction.billNumber);
-  // console.log('orderAmount: ',data.transaction.amount);
-  // console.log('reference: ',data.transaction.reference);
-
-
-  // jengaDeposit();
-  
+  // console.log(JSON.stringify(data));
+  console.log('Transaction Details: \nTx Info: ',data.transaction.additionalInfo);  
   let depositAditionalInfo = data.transaction.additionalInfo;
   let amount = data.transaction.amount;
 
@@ -1468,19 +1496,15 @@ jengaApi.post("/deposit", async (req, res) => {
   
   // Retrieve User Blockchain Data
   let depositInfo = await getSenderDetails(depositId);
-  // console.log('Sender Info: ', JSON.stringify(depositInfo.data()))
-  //let senderprivkey = await getSenderPrivateKey(depositInfo.data().seedKey, depositMSISDN, iv)
-
   let escrowInfo = await getReceiverDetails(escrowId);
-  let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv)
-  // console.log('pk:',escrowprivkey);
+  let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv);
   let cusdAmount = number_format(amount, 4);
-  cusdAmount = cusdAmount*kes2UsdRate;
+  cusdAmount = cusdAmount*usdMarketRate;
   console.log(`CUSD deposit amount: ${cusdAmount}`);
 
   
 
-  let receipt = await transfercUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, cusdAmount, escrowprivkey);
+  let receipt = await sendcUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, `${cusdAmount}`, escrowprivkey);
   let url = await getTxidUrl(receipt.transactionHash);
   let message2depositor = `You have deposited KES ${amount} to your Celo Account.\nReference: ${data.transaction.billNumber}\nTransaction Link:  ${url}`;
   console.log('tx URL', url);
@@ -1553,8 +1577,8 @@ async function addUserDataToDB(userId, userMSISDN){
     // console.log('Encrypted seed=> ', enc_seed);
     let publicAddress = await getPublicAddress(mnemonic);
     console.log('Public Address: ', publicAddress); 
-    let initdepohash = await signupDeposit(publicAddress);
-    console.log('Signup Deposit', JSON.stringify(initdepohash));
+    // let initdepohash = await signupDeposit(publicAddress);
+    // console.log('Signup Deposit', JSON.stringify(initdepohash));
 
     // let message2receiver = `Welcome to Kotanipay.\nYour account has been created.\nDial *483*354# to verify your account`;
     // console.log('Send SMS to user: \n',JSON.stringify(message2receiver));
@@ -1582,8 +1606,8 @@ async function signupDeposit(publicAddress){
   let escrowInfo = await getSenderDetails(escrowId);
   let escrowPrivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv);
 
-  let receipt = await transfercUSD(escrowInfo.data().publicAddress, publicAddress, '0.02', escrowPrivkey);  
-  let celohash = await sendcGold(escrowInfo.data().publicAddress, publicAddress, '0.01', escrowPrivkey);
+  let receipt = await sendcUSD(escrowInfo.data().publicAddress, publicAddress, '0.002', escrowPrivkey);  
+  let celohash = await sendcGold(escrowInfo.data().publicAddress, publicAddress, '0.001', escrowPrivkey);
   console.log(`Signup deposit tx hash: ${receipt.transactionHash}`);
   return receipt.transactionHash;
 }       

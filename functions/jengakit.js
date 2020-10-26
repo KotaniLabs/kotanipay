@@ -257,8 +257,7 @@ const sendFromJengaToMobileMoney = async (amount, currencyCode, countryCode, rec
           "description": "Cash From Kotani Pay via Jenga"
       }
     }
-  });  
-  // console.log('sendFromJengaToMobileMoney Data: ',JSON.stringify(res.data));
+  });
   return res.data;
 };
 
