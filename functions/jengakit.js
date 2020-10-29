@@ -138,13 +138,13 @@ const getMiniStatement = async () => {
   return res.data;
 };
 
-const receiveMpesaStkDeposit = async (mobileNumber, amount) => {
+const receiveMpesaStkDeposit = async (mobileNumber, referenceCode,  amount) => {
   try{
     let jenga_mpesaStkpush_url = `https://api.jengahq.io/transaction/v2/payment/mpesastkpush`;
     let access_token = await getAccessToken();
     // console.log(access_token);
-    let reference = await generateReferenceCode();
-    // console.log(reference);
+    let referenceCode = await generateReferenceCode();
+    // console.log(referenceCode);
 
     let res = await axios({
       method: 'post',
@@ -162,7 +162,7 @@ const receiveMpesaStkDeposit = async (mobileNumber, amount) => {
             "amount": "100",
             "description": "Kotani Pay STKPUSH",
             "businessNumber": "915170",
-            "reference": reference
+            "reference": referenceCode
         }
       }
     });
@@ -182,17 +182,17 @@ const getReceiveFromEasypaySignature = async (trxReference, trxAmount, merchantC
   return signature_b64;
 };
 
-const receiveFromEazzypayPush = async (mobileNumber, amount) => {
+const receiveFromEazzypayPush = async (mobileNumber, referenceCode,  amount) => {
   try{
     let jenga_mpesaStkpush_url = `https://api.jengahq.io/transaction/v2/payments`;
 
     let access_token = await getAccessToken();
     // console.log(access_token);
 
-    let reference = await generateReferenceCode();
+    let referenceCode = await generateReferenceCode();
     // console.log(reference);
 
-    let signature = await getReceiveFromEasypaySignature(reference, amount, merchant_code, country_code);
+    let signature = await getReceiveFromEasypaySignature(referenceCode, amount, merchant_code, country_code);
     // console.log(signature);
 
     let res = await axios({
@@ -212,7 +212,7 @@ const receiveFromEazzypayPush = async (mobileNumber, amount) => {
             "amount": amount,
             "description": "Kotani Pay EazzyPay PUSH",
             "type": "EazzyPayOnline",
-            "reference": reference
+            "reference": referenceCode
         }
       }
     });
@@ -221,9 +221,9 @@ const receiveFromEazzypayPush = async (mobileNumber, amount) => {
 };
 
 
-const sendFromJengaToMobileMoney = async (amount, currencyCode, countryCode, recipientName, mobileNumber) => {
+const sendFromJengaToMobileMoney = async (amount, referenceCode, currencyCode, countryCode, recipientName, mobileNumber) => {
   let access_token = await getAccessToken();
-  let referenceCode = await generateReferenceCode();
+  // let referenceCode = await generateReferenceCode();
   let signature = await getSendToUserMobileSignature(amount, currencyCode, referenceCode);
   let date = await getTimeStamp();
 
@@ -302,12 +302,41 @@ const getUserKyc = async (merchantcode, documentType, documentNumber, firstName,
   return res.data;
 };
 
+const getTransactionStatus = async (requestId, date) => {
+  let access_token = await getAccessToken();
+  console.log('Access Token: ',access_token);
+
+  // let signature = await getKycSignature(merchantcode, documentNumber, countryCode);
+  // console.log('Signature=> ',signature)
+  //"ID",//"Stephen", //"Kiarie",//"1984-07-06",  //23583908, //"KE"
+  let res = await axios({
+    method: 'post',
+    url: `https://api.jengahq.io/transaction/v2/b2c/status/query`,
+    data: { 
+      "requestId": requestId,
+      "destination": {
+         "type": "M-Pesa"
+      },
+      "transfer": {
+         "date": date
+      }
+    },
+    headers: {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  return res.data;
+};
+
 module.exports = { 
+  generateReferenceCode,
   getBalance,
   getMiniStatement,
   receiveMpesaStkDeposit,
   receiveFromEazzypayPush,
   sendFromJengaToMobileMoney,
-  getUserKyc
+  getUserKyc,
+  getTransactionStatus
 }
 

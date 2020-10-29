@@ -27,6 +27,7 @@
     "firebase-functions": "^3.11.0",
     "icon-sdk-js": "0.0.18",
     "jsonwebtoken": "^8.5.1",
+    "moment": "^2.29.1",
     "morgan": "^1.10.0",
     "mpesa-api": "^2.3.3",
     "mpesa-node": "^0.1.3",

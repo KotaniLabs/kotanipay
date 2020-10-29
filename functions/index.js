@@ -22,7 +22,8 @@ const express = require('express');
  const bodyParser = require('body-parser');
  const bearerToken = require('express-bearer-token');
  const jwt = require('jsonwebtoken');
- const fs = require('fs')
+ const fs = require('fs');
+ const moment = require('moment');
  // const { createFirebaseAuth } = require ('./middlewares/express_firebase_auth');
  const { ussdRouter } = require ('ussd-router');
 
@@ -77,7 +78,10 @@ var { getTxidUrl,
       sendMessage,
       arraytojson,
       stringToObj,
-      parseMsisdn 
+      parseMsisdn,
+      emailIsValid,
+      isDobValid,
+      isValidKePhoneNumber
 } = require('./utilities');
 
 //ENV VARIABLES
@@ -146,18 +150,18 @@ app.post("/", async (req, res) => {
   res.set('Content-Type: text/plain');
   // const { sessionId, serviceCode, phoneNumber, text } = req.body;
   const { body: { phoneNumber: phoneNumber } } = req;
-  const { body: { text: rawText } } = req;  
+  const { body: { text: rawText } } = req; 
   const text = ussdRouter(rawText);
   const footer = '\n0: Home 00: Back';
-  let msg = ''; 
+  let msg = '';
   
   senderMSISDN = phoneNumber.substring(1);
-  senderId = await getSenderId(senderMSISDN)
+  senderId = await getSenderId(senderMSISDN);
   // console.log('senderId: ', senderId);   
   var data = text.split('*'); 
   let userExists = await checkIfSenderExists(senderId);
   // console.log("Sender Exists? ",userExists);
-  if(userExists === false){         
+  if(userExists === false){       
     let userCreated = await createNewUser(senderId, senderMSISDN);     
     console.log('Created user with userID: ', userCreated); 
     // msg += `END Creating your account on KotaniPay`;    
@@ -440,29 +444,23 @@ app.post("/", async (req, res) => {
             } catch (error) { console.log(error); }
             console.log('Withdrawer MobileNumber', mobileNumber, 'Amount:', kesAmountToReceive);
             // try{
-            let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(kesAmountToReceive, currencyCode, countryCode, recipientName, mobileNumber)
-            console.log('Sending From Jenga to Mpesa status => ',withdrawToMpesa.status)
-              // console.log('Sending From Jenga to Mpesa Status => ', JSON.stringify(withdrawToMpesa.status));
-            // }catch(e){console.log('Error: Unable to process index.js ln_445')}
-            // jenga.sendFromJengaToMobileMoney(kesAmountToReceive, currencyCode, countryCode, recipientName, mobileNumber)
-            // .then(res => {
-            //   console.log('Sending From Jenga to Mpesa => \n',res);
-            //   withdrawToMpesa = res;
-            //   return;
-            // })
-            // .catch(e=>{console.log('Unable to process\n',e.response)})
+            let referenceCode = await jenga.generateReferenceCode();
+            console.log('refcode: ',referenceCode);
+            let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(kesAmountToReceive, referenceCode, currencyCode, countryCode, recipientName, mobileNumber);
+            console.log('Sending From Jenga to Mpesa status => ',withdrawToMpesa.status);
             
             if(withdrawToMpesa.status === "SUCCESS"){
               let JengaTxDetails = {
                 "recipientNumber" : `${mobileNumber}`,
                 "recipientName" : `${displayName}`,
                 "amount" : `${_kesAmountToReceive}`,
-                "withdrawId" : withdrawId,
+                "referenceCode" : referenceCode,
                 "date" : new Date().toLocaleString()
               }
               await logJengaProcessedTransaction(txreceipt.transactionHash, JengaTxDetails);
-              // jenga.sendFromJengaToMobileMoney(data[1], 'KES', 'KE',`${fullname}`, withdrawMSISDN) 
-              let message2receiver = `You have Withdrawn KES ${_kesAmountToReceive} from your Celo Account.`;
+
+              let url = await getTxidUrl(txreceipt.transactionHash);
+              let message2receiver = `You have Withdrawn KES ${_kesAmountToReceive} from your Celo Account.\nRef Code: ${referenceCode}\nTransaction URL:  ${url}`;
               sendMessage("+"+withdrawMSISDN, message2receiver); 
             } else{
               console.log(`+${withdrawMSISDN} withdrawal of amount ${_kesAmountToReceive} has failed: txhash: ${txreceipt.transactionHash}`)
@@ -760,6 +758,7 @@ function isAuthenticated(req, res, next) {
   }
 }
 
+//@todo: Implement the API authentication
 restapi.post('/jwt', async(req, res) => {
   const privateKey = fs.readFileSync('jenga-api/privatekey.pem', 'utf-8');
   let token = jwt.sign({"body" : "stuff"}, privateKey, {algorithm: 'HS256'});
@@ -1200,11 +1199,6 @@ restapi.post('/kyc', async (req, res) => {
     console.log("Received request for: " + req.url);
     // const { body: { phoneNumber: phoneNumber } } = req;
     // const { body: { documentType: documentType } } = req;
-    // const { body: { documentNumber: documentNumber } } = req;
-    // const { body: { firstname: firstname } } = req;
-    // const { body: { lastname: lastname } } = req;
-    // const { body: { dateofbirth: dateofbirth } } = req;
-    // const { body: { email: email } } = req;
     const phoneNumber = req.body.phoneNumber;
     let documentType = req.body.documentType;
     let documentNumber = req.body.documentNumber;
@@ -1212,7 +1206,6 @@ restapi.post('/kyc', async (req, res) => {
     let lastname = req.body.lastname;
     let dateofbirth = req.body.dateofbirth;
     let email = req.body.email;
-
     let userMSISDN = ''; 
 
     try {
@@ -1221,6 +1214,18 @@ restapi.post('/kyc', async (req, res) => {
     } catch (err) { console.log(err); }
     userMSISDN = userMSISDN.substring(1);
     // console.log(`Validated Number: ${validatedNumber}`);
+    // VALIDATE DOB
+    // var m = moment(dateofbirth, 'YYYY-MM-DD');
+    // isDobValid
+    if(isDobValid(dateofbirth)==false){
+      let message = {       
+        "status": `error`, 
+        "Details": `Invalid Date format`,
+        "comment": `Set date to format: YYYY-MM-DD`   
+      };  
+      res.json(message);
+      return;
+    }
     
     console.log('userMSISDN: ', userMSISDN)
     let userId  = await getSenderId(userMSISDN)
@@ -1243,7 +1248,8 @@ restapi.post('/kyc', async (req, res) => {
         "phoneNumber" : `${userMSISDN}`,
         "Details": `The user account cannot be created from the KYC API`   
       };    
-      res.json(message);  
+      res.json(message);
+      return;
     } 
 
     let isKyced = await checkisUserKyced(userId);
@@ -1272,6 +1278,7 @@ restapi.post('/kyc', async (req, res) => {
       res.json(message);    
     }
   }catch(e){
+    console.log(e)
     let message = {       
       "status": `error`, 
       "Details": `Invalid PhoneNumber Supplied`,
@@ -1287,6 +1294,14 @@ restapi.post("/depositfunds", async (req, res) => {
   const data = req.body;
   console.log('B2C Data: ',data);
   res.send(`Funds deposit coming soon: ${data}`); 
+});
+
+//parameters: {celloAddress, phoneNumber, amount} 
+restapi.post("/getWithdrawTransactionStatus", async (req, res) => { 
+  let requestId = req.body.requestId;
+  let requestDate = req.body.requestDate;
+  let status = await jenga.getTransactionStatus(requestId, requestDate);
+  res.json(status);
 });
 
 async function validateCeloTransaction(txhash){    
@@ -1316,8 +1331,8 @@ async function processApiWithdraw(withdrawMSISDN, amount){
       mobileNumber = '0'+number.getNationalNumber();
     } catch (error) { console.log(error); }
     console.log('Withdrawer MobileNumber', mobileNumber);
-
-    let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(amount, currencyCode, countryCode, recipientName, mobileNumber);
+    let referenceCode = jenga.generateReferenceCode();
+    let withdrawToMpesa = await jenga.sendFromJengaToMobileMoney(amount, referenceCode, currencyCode, countryCode, recipientName, mobileNumber);
     console.log('Sending From Jenga to Mpesa Status => ', JSON.stringify(withdrawToMpesa.status));
 
     // jenga.sendFromJengaToMobileMoney(data[1], 'KES', 'KE',`${fullname}`, withdrawMSISDN) 
@@ -1329,7 +1344,8 @@ async function processApiWithdraw(withdrawMSISDN, amount){
       "recipientName": displayName,
       "message": `Withdraw via Kotanipay successful`,
       "recipient": `${withdrawMSISDN}`,
-      "amount": `${amount} KES`
+      "amount": `${amount} KES`,
+      "referenceCode" : `${referenceCode}`
     };
     return message
     
@@ -1349,7 +1365,6 @@ async function checkisUserKyced(userId){
   }
   return isKyced;
 }
-
 
 async function getProcessedTransaction(txhash){
   let docRef = firestore.collection('processedtxns').doc(txhash);
@@ -1377,7 +1392,7 @@ async function setProcessedTransaction(txhash, txdetails){
 async function logJengaProcessedTransaction(txid, txdetails){
   try {
     let db = firestore.collection('jengaWithdrawTxns').doc(txid);
-    db.set(txdetails).then(newDoc => {console.log("Jenga Transaction processed: => ", newDoc.id)})
+    db.set(txdetails).then(newDoc => {console.log("Jenga Transaction processed: => ", newDoc.data())})
     
   } catch (err) { console.log(err) }
 }
@@ -1509,12 +1524,6 @@ jengaApi.post("/deposit", async (req, res) => {
   let message2depositor = `You have deposited KES ${amount} to your Celo Account.\nReference: ${data.transaction.billNumber}\nTransaction Link:  ${url}`;
   console.log('tx URL', url);
   sendMessage("+"+depositMSISDN, message2depositor);
-
-  //var options = { noColor: true };
-  // Read variables sent via POST from our SDK
-  
-  // const data = req.body;
-  // console.log(data);
   res.send('Jenga API Callback Successful!');
 });
 
