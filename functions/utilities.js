@@ -1,6 +1,11 @@
 var tinyURL = require('tinyurl');
 const functions = require('firebase-functions');
 const bodyParser = require('body-parser');
+const moment = require('moment');
+
+const PNF = require('google-libphonenumber').PhoneNumberFormat;
+const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
+
 // const prettyjson = require('prettyjson');
 // var options = { noColor: true };
 const randomstring = require('randomstring')
@@ -126,6 +131,25 @@ function parseMsisdn(userMSISDN){
   return e64phoneNumber.number;    
 }
 
+function emailIsValid (email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function isDobValid(dateofbirth){
+  var m = moment(dateofbirth, 'YYYY-MM-DD');
+  return m.isValid();
+}
+
+
+function isValidKePhoneNumber(phoneNumber){
+  // let phone = '082 067 0789 ';
+  // let receiverMSISDN = parseMsisdn(data).substring(1)
+  // console.log('E64 Number: ', receiverMSISDN)
+  const _phone = phoneUtil.parseAndKeepRawInput(phoneNumber, 'KE');
+  let isValidKe = phoneUtil.isValidNumber(_phone);
+  //phone = phone.replaceAll("[^0-9]", "");
+  console.log(isValidKe)
+}
 
 module.exports = { 
     getTxidUrl,
@@ -137,5 +161,8 @@ module.exports = {
     sendMessage,
     arraytojson,
     stringToObj,
-    parseMsisdn    
+    parseMsisdn,
+    emailIsValid,
+    isDobValid,
+    isValidKePhoneNumber
 }
