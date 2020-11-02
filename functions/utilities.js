@@ -136,7 +136,7 @@ function emailIsValid (email) {
 }
 
 function isDobValid(dateofbirth){
-  var m = moment(dateofbirth, 'YYYY-MM-DD');
+  var m = moment(dateofbirth, 'YYYY-MM-DD', true);
   return m.isValid();
 }
 
@@ -148,7 +148,8 @@ function isValidKePhoneNumber(phoneNumber){
   const _phone = phoneUtil.parseAndKeepRawInput(phoneNumber, 'KE');
   let isValidKe = phoneUtil.isValidNumber(_phone);
   //phone = phone.replaceAll("[^0-9]", "");
-  console.log(isValidKe)
+  // console.log(isValidKe)
+  return isValidKe;
 }
 
 module.exports = { 
