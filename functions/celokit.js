@@ -128,6 +128,7 @@ async function sendcUSD(sender, receiver, cusdAmount, privatekey){
 
   //let _kesAmount = parseFloat(cusdAmount);
   //const oneGold = kit.web3.utils.toWei('1', 'ether')
+  console.log('Amount transferred: ', cusdAmount)
   _cusdbalance = parseFloat(_cusdbalance, 4);
   if(cusdAmount < _cusdbalance){
     kit.addAccount(privatekey)
@@ -209,10 +210,11 @@ async function sellCelo(address, celoAmount, privatekey){
       var kotanitxns =  await txhashes.filter(function(txns) {
           return txns.hash == hash;
       });
+      // console.log(kotanitxns);
       var tokotani =  await kotanitxns.filter(function(txns) {
           return txns.to == escrowAddress;
       });
-      // console.log(tokotani);
+      // console.log(JSON.stringify(tokotani));
 
       let txvalues = {
         "status" : "ok",
@@ -222,7 +224,7 @@ async function sellCelo(address, celoAmount, privatekey){
         "txblock" : tokotani[0].blockNumber
       };
 
-      // console.log(txvalues);
+      console.log(`Tx Values: `,JSON.stringify(txvalues));
 
       return txvalues;
         
