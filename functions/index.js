@@ -783,9 +783,14 @@ restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
     if(userstatusresult === false){ 
       let userCreated = await createNewUser(userId, userMSISDN);     
       console.log('Created user with userID: ', userCreated); 
-    }    
+    }   
     
     let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
     console.log('User Address => ', userInfo.data().publicAddress);
 
     let message = {       
@@ -828,9 +833,14 @@ restapi.post('/getbalance', async (req, res) => {
     if(userstatusresult == false){ 
       let userCreated = await createNewUser(userId, userMSISDN);     
       console.log('Created user with userID: ', userCreated); 
-    }    
+    }
     
     let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
     console.log('User Address => ', userInfo.data().publicAddress);
     
     const cusdtoken = await kit.contracts.getStableToken()
@@ -892,6 +902,11 @@ restapi.post('/transactions', async (req, res) => {
     }    
     
     let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
     console.log('User Address => ', userInfo.data().publicAddress);
 
     let response  = await axios.get(`https://explorer.celo.org/api?module=account&action=tokentx&address=${userInfo.data().publicAddress}#`)
@@ -1544,38 +1559,60 @@ jengaApi.post("/deposit", async (req, res) => {
   console.log('Depositor PhoneNumber: ',depositDetails[1]);
   let depositMSISDN = depositDetails[1];
 
-  //DEPOSIT VIA EQUITY PAYBILL or TILL NUMBER
-  const escrowMSISDN = functions.config().env.escrow.msisdn;
-  escrowId = await getRecipientId(escrowMSISDN);
-  console.log('escrowId: ', escrowId);
-  
-  depositId = await getSenderId(depositMSISDN)
-  console.log('depositId: ', depositId);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(depositMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-  await admin.auth().getUser(depositId)
-  .then(user => {
-    console.log('Depositor fullName: ',user.displayName); 
-    // displayName = user.displayName;
-    return;
-  })
-  .catch(e => {console.log(e)})
-  
-  // Retrieve User Blockchain Data
-  let depositInfo = await getSenderDetails(depositId);
-  let escrowInfo = await getReceiverDetails(escrowId);
-  let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv);
-  let cusdAmount = number_format(amount, 4);
-  cusdAmount = cusdAmount*usdMarketRate;
-  console.log(`CUSD deposit amount: ${cusdAmount}`);
+  if(_isValidKePhoneNumber == true){
+    //DEPOSIT VIA EQUITY PAYBILL or TILL NUMBER
+    const escrowMSISDN = functions.config().env.escrow.msisdn;
+    escrowId = await getRecipientId(escrowMSISDN);
+    console.log('escrowId: ', escrowId);
+    
+    depositId = await getSenderId(depositMSISDN);
 
-  
+    //@task check that the depositor account exists
+    let userstatusresult = await checkIfSenderExists(depositId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult == false){ 
+      let userCreated = await createNewUser(depositId, depositMSISDN);     
+      console.log('Created user with userID: ', userCreated);
+    } 
+    let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
+    console.log('User Address => ', userInfo.data().publicAddress);
+    console.log('depositId: ', depositId);
 
-  let receipt = await sendcUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, `${cusdAmount}`, escrowprivkey);
-  let url = await getTxidUrl(receipt.transactionHash);
-  let message2depositor = `You have deposited KES ${amount} to your Celo Account.\nReference: ${data.transaction.billNumber}\nTransaction Link:  ${url}`;
-  console.log('tx URL', url);
-  sendMessage("+"+depositMSISDN, message2depositor);
-  res.send('Jenga API Callback Successful!');
+    await admin.auth().getUser(depositId)
+    .then(user => {
+      console.log('Depositor fullName: ',user.displayName); 
+      // displayName = user.displayName;
+      return;
+    })
+    .catch(e => {console.log(e)})
+    
+    // Retrieve User Blockchain Data
+    let depositInfo = await getSenderDetails(depositId);
+    let escrowInfo = await getReceiverDetails(escrowId);
+    let escrowprivkey = await getSenderPrivateKey(escrowInfo.data().seedKey, escrowMSISDN, iv);
+    let cusdAmount = number_format(amount, 4);
+    cusdAmount = cusdAmount*usdMarketRate;
+    console.log(`CUSD deposit amount: ${cusdAmount}`);
+
+    
+
+    let receipt = await sendcUSD(escrowInfo.data().publicAddress, depositInfo.data().publicAddress, `${cusdAmount}`, escrowprivkey);
+    let url = await getTxidUrl(receipt.transactionHash);
+    let message2depositor = `You have deposited KES ${amount} to your Celo Account.\nReference: ${data.transaction.billNumber}\nTransaction Link:  ${url}`;
+    console.log('tx URL', url);
+    sendMessage("+"+depositMSISDN, message2depositor);
+    res.send('Jenga API Callback Successful!');
+  }else{
+    console.log('Unable to process Jenga Deposit trx: ', depositAditionalInfo);
+  }
 });
 
 //USSD APP
