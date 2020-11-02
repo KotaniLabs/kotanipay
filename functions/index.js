@@ -771,26 +771,38 @@ restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
     console.log(error); 
   }
   userMSISDN = userMSISDN.substring(1);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-  let userId  = await getSenderId(userMSISDN)
-  console.log('UserId: ', userId)
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
 
-  let userstatusresult = await checkIfSenderExists(userId);
-  console.log("User Exists? ",userstatusresult);
-  if(userstatusresult === false){ 
-    let userCreated = await createNewUser(userId, userMSISDN);     
-    console.log('Created user with userID: ', userCreated); 
-  }    
-  
-  let userInfo = await getSenderDetails(userId);
-  console.log('User Address => ', userInfo.data().publicAddress);
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult === false){ 
+      let userCreated = await createNewUser(userId, userMSISDN);     
+      console.log('Created user with userID: ', userCreated); 
+    }    
+    
+    let userInfo = await getSenderDetails(userId);
+    console.log('User Address => ', userInfo.data().publicAddress);
 
-  let message = {       
-    "phoneNumber": `${userMSISDN}`, 
-    "address": `${userInfo.data().publicAddress}`      
-  };
+    let message = {       
+      "phoneNumber": `${userMSISDN}`, 
+      "address": `${userInfo.data().publicAddress}`      
+    };
 
-  res.json(message);
+    res.json(message);
+  }else{
+    let message = { 
+      "status" : `error`,      
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid KE phoneNumber`      
+    };
+
+    res.json(message);
+  }
 });
 
 //parameter: {"phoneNumber" : "E.164 number" }
@@ -804,42 +816,53 @@ restapi.post('/getbalance', async (req, res) => {
     console.log(error); 
   }
   userMSISDN = userMSISDN.substring(1);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-  let userId  = await getSenderId(userMSISDN)
-  console.log('UserId: ', userId)
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
 
-  let userstatusresult = await checkIfSenderExists(userId);
-  console.log("User Exists? ",userstatusresult);
-  if(userstatusresult == false){ 
-    let userCreated = await createNewUser(userId, userMSISDN);     
-    console.log('Created user with userID: ', userCreated); 
-  }    
-  
-  let userInfo = await getSenderDetails(userId);
-  console.log('User Address => ', userInfo.data().publicAddress);
-  
-  const cusdtoken = await kit.contracts.getStableToken()
-  let cusdBalance = await cusdtoken.balanceOf(userInfo.data().publicAddress) // In cUSD
-  console.log(`CUSD Balance Before: ${cusdBalance}`)
-  //cusdBalance = kit.web3.utils.fromWei(cusdBalance.toString(), 'ether');
-  console.info(`Account balance of ${await weiToDecimal(cusdBalance)} CUSD`)
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult == false){ 
+      let userCreated = await createNewUser(userId, userMSISDN);     
+      console.log('Created user with userID: ', userCreated); 
+    }    
+    
+    let userInfo = await getSenderDetails(userId);
+    console.log('User Address => ', userInfo.data().publicAddress);
+    
+    const cusdtoken = await kit.contracts.getStableToken()
+    let cusdBalance = await cusdtoken.balanceOf(userInfo.data().publicAddress) // In cUSD
+    console.log(`CUSD Balance Before: ${cusdBalance}`)
+    //cusdBalance = kit.web3.utils.fromWei(cusdBalance.toString(), 'ether');
+    console.info(`Account balance of ${await weiToDecimal(cusdBalance)} CUSD`)
 
-  const celotoken = await kit.contracts.getGoldToken()
-  let celoBalance = await celotoken.balanceOf(userInfo.data().publicAddress) // In cGLD
-  //console.log(`CELO Balance Before: ${celoBalance}`)
-  //celoBalance = kit.web3.utils.fromWei(celoBalance.toString(), 'ether');    
-  console.info(`Account balance of ${await weiToDecimal(celoBalance)} CELO`);
-  //@TODO: Apply localization to the balance values
+    const celotoken = await kit.contracts.getGoldToken()
+    let celoBalance = await celotoken.balanceOf(userInfo.data().publicAddress) // In cGLD
+    //console.log(`CELO Balance Before: ${celoBalance}`)
+    //celoBalance = kit.web3.utils.fromWei(celoBalance.toString(), 'ether');    
+    console.info(`Account balance of ${await weiToDecimal(celoBalance)} CELO`);
+    //@TODO: Apply localization to the balance values
 
-  let message = {       
-    "Address": `${userInfo.data().publicAddress}`, 
-    "Balance": {
-      "cusd" : `${await weiToDecimal(cusdBalance)}`, 
-      "celo" : `${await weiToDecimal(celoBalance)}`,
-    }   
-  };
+    let message = {       
+      "Address": `${userInfo.data().publicAddress}`, 
+      "Balance": {
+        "cusd" : `${await weiToDecimal(cusdBalance)}`, 
+        "celo" : `${await weiToDecimal(celoBalance)}`,
+      }   
+    };
 
-  res.json(message);
+    res.json(message);
+  }else{
+    let message = { 
+      "status" : `error`,      
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid KE phoneNumber`      
+    };
+    res.json(message);
+  }
 });
 
 //parameter: {"phoneNumber" : "E.164 number" }
@@ -854,29 +877,40 @@ restapi.post('/transactions', async (req, res) => {
     console.log(error); 
   }
   userMSISDN = userMSISDN.substring(1);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-  let userId  = await getSenderId(userMSISDN)
-  console.log('UserId: ', userId)
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
 
-  let userstatusresult = await checkIfSenderExists(userId);
-  console.log("User Exists? ",userstatusresult);
-  if(userstatusresult == false){ 
-    let userCreated = await createNewUser(userId, userMSISDN);     
-    console.log('Created user with userID: ', userCreated);
-  }    
-  
-  let userInfo = await getSenderDetails(userId);
-  console.log('User Address => ', userInfo.data().publicAddress);
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult == false){ 
+      let userCreated = await createNewUser(userId, userMSISDN);     
+      console.log('Created user with userID: ', userCreated);
+    }    
+    
+    let userInfo = await getSenderDetails(userId);
+    console.log('User Address => ', userInfo.data().publicAddress);
 
-  let response  = await axios.get(`https://explorer.celo.org/api?module=account&action=tokentx&address=${userInfo.data().publicAddress}#`)
-  // console.log(response.data.result);  
+    let response  = await axios.get(`https://explorer.celo.org/api?module=account&action=tokentx&address=${userInfo.data().publicAddress}#`)
+    // console.log(response.data.result);  
 
-  let message = {       
-    "phoneNumber": `${userMSISDN}`, 
-    "transactions": response.data.result
-  };
+    let message = {       
+      "phoneNumber": `${userMSISDN}`, 
+      "transactions": response.data.result
+    };
 
-  res.json(message);
+    res.json(message);
+  }else{
+    let message = { 
+      "status" : `error`,      
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid KE phoneNumber`      
+    };
+    res.json(message);
+  } 
 });
 
 restapi.post("/getkotanipayescrow", async (req, res) => { 
@@ -893,7 +927,6 @@ restapi.post("/getkotanipayescrow", async (req, res) => {
     "conversionRate" : { "cusdToKes" : `${cusd2kesRate}` },
     "maxWithdrawAmount" : `CUSD ${number_format(`${jengabalance.balances[0].amount*kes2UsdRate}`, 2)}`
   };
-
   res.json(message);
 });
 
@@ -907,139 +940,151 @@ restapi.post("/withdraw", async (req, res) => {
     userMSISDN = phoneUtil.format(recnumber, PNF.E164);
   } catch (error) {console.log(error); }
   userMSISDN = userMSISDN.substring(1);
-  let userId  = await getSenderId(userMSISDN);
+  
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-  if(txhash !== null && txhash !==''){  //Check for empty or null tx hash  0xd3625b379fbe8fd5d36906c618f61b53dd8f546e6255a189a7f8be4cc8c00634
-    var txreceipt = await validateCeloTransaction(txhash);
-    if(txreceipt !== null){  //check for a null tx receipt due to invalid hash
-      // console.log('Txn Receipt=> ', JSON.stringify(txreceipt));
-      console.log('Status: ', txreceipt.status);
-      // let escrowId  = await getSenderId(escrowMSISDN)
-      // let escrowInfo = await getSenderDetails(escrowId);
-      // console.log('User Address => ', escrowInfo.data().publicAddress);
-      let escrowAddress = `0x0e93296c605730b88efaf0b698fb8269d022a590`;
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN);
+    if(txhash !== null && txhash !==''){  //Check for empty or null tx hash  0xd3625b379fbe8fd5d36906c618f61b53dd8f546e6255a189a7f8be4cc8c00634
+      var txreceipt = await validateCeloTransaction(txhash);
+      if(txreceipt !== null){  //check for a null tx receipt due to invalid hash
+        // console.log('Txn Receipt=> ', JSON.stringify(txreceipt));
+        console.log('Status: ', txreceipt.status);
+        // let escrowId  = await getSenderId(escrowMSISDN)
+        // let escrowInfo = await getSenderDetails(escrowId);
+        // console.log('User Address => ', escrowInfo.data().publicAddress);
+        let escrowAddress = `0x0e93296c605730b88efaf0b698fb8269d022a590`;
 
-      let txdetails = await validateWithdrawHash(txhash, escrowAddress);
-      // console.log(txdetails)
-      if(txdetails.status === "ok"){ //Valid Deposit to Escrow Hash. Get tx Details        
+        let txdetails = await validateWithdrawHash(txhash, escrowAddress);
         // console.log(txdetails)
+        if(txdetails.status === "ok"){ //Valid Deposit to Escrow Hash. Get tx Details        
+          // console.log(txdetails)
 
-        let validblocks = txdetails.txblock;
-        let _validblocks = parseInt(validblocks)
-        _validblocks = _validblocks + 1440
+          let validblocks = txdetails.txblock;
+          let _validblocks = parseInt(validblocks)
+          _validblocks = _validblocks + 1440
 
-        // console.log('Valid Blocks', _validblocks);
-        let latestblock = await getLatestBlock();
-        let _latestblock = parseInt(latestblock.number);
-        // console.log('Latest Block', _latestblock);
-        if(txreceipt.status === true && _validblocks >= _latestblock ){   //check that the tx TO: address if the kotaniEscrow Address  //"0xe6b8f07271b97be93d95b18bbe891860b0b7e07f"
-          console.log('Processing MPESA withdraw Transaction')
-          try{
-            //Forward Tx to Jenga API
-            // let existstatus = await checkIfUserAccountExist(userId, userMSISDN);
-            let userExists = await checkIfSenderExists(userId);
-            if(userExists === false){         
-              let userCreated = await createNewUser(userId, userMSISDN);     
-              console.log('Created user with userID: ', userCreated); 
-            }
-            // console.log('Exists: ',existstatus)
-            // let isVerified = await checkIsUserVerified(senderId)
-            // console.log('Verified: ',isVerified)
-            let isverified = await checkIfUserisVerified(userId);   
-            console.log('isverified: ', isverified) 
-            // let isKyced = await checkisUserKyced(userId);
-            // if(isKyced == true)
-            if(isverified === false){     //  && data[0] !== '7' && data[1] !== '4'
-              // console.log("User: ", senderId, "is NOT VERIFIED!");
-              // msg += `END Verify your account by dialing *483*354*7*4#`;
-              res.json({
-                "status": 'unverified',
-                "message": "user account is not verified",
-                "comment" : "Access https://europe-west3-kotanimac.cloudfunctions.net/restapi/kyc to verify your account"
-              })    
-            }else{
-              let isProcessed = await getProcessedTransaction(txhash);
-              console.log('isProcessed: ', isProcessed) 
-              if(isProcessed === true){
-                let message = {
-                  "status": `failed`,
-                  "message": `Transaction Hash is already processed`
-                };
-                res.json(message);
-
+          // console.log('Valid Blocks', _validblocks);
+          let latestblock = await getLatestBlock();
+          let _latestblock = parseInt(latestblock.number);
+          // console.log('Latest Block', _latestblock);
+          if(txreceipt.status === true && _validblocks >= _latestblock ){   //check that the tx TO: address if the kotaniEscrow Address  //"0xe6b8f07271b97be93d95b18bbe891860b0b7e07f"
+            console.log('Processing MPESA withdraw Transaction')
+            try{
+              //Forward Tx to Jenga API
+              // let existstatus = await checkIfUserAccountExist(userId, userMSISDN);
+              let userExists = await checkIfSenderExists(userId);
+              if(userExists === false){         
+                let userCreated = await createNewUser(userId, userMSISDN);     
+                console.log('Created user with userID: ', userCreated); 
+              }
+              // console.log('Exists: ',existstatus)
+              // let isVerified = await checkIsUserVerified(senderId)
+              // console.log('Verified: ',isVerified)
+              let isverified = await checkIfUserisVerified(userId);   
+              console.log('isverified: ', isverified) 
+              // let isKyced = await checkisUserKyced(userId);
+              // if(isKyced == true)
+              if(isverified === false){     //  && data[0] !== '7' && data[1] !== '4'
+                // console.log("User: ", senderId, "is NOT VERIFIED!");
+                // msg += `END Verify your account by dialing *483*354*7*4#`;
+                res.json({
+                  "status": 'unverified',
+                  "message": "user account is not verified",
+                  "comment" : "Access https://europe-west3-kotanimac.cloudfunctions.net/restapi/kyc to verify your account"
+                })    
               }else{
-                let withdrawDetails = {
-                  "blockNumber" : txdetails.txblock,
-                  "value" : `${txdetails.value} CUSD`,
-                  "from" : txdetails.from,
-                  "to" : txdetails.to,
-                  "date" : new Date().toLocaleString()
-                }
-                let _cusdAmount = number_format(txdetails.value, 4)
-                let cusdWithdrawRate = usdMarketRate*0.98;
-                let kesAmountToReceive =  _cusdAmount*cusdWithdrawRate;
-                console.log(`Withdraw Amount KES: ${kesAmountToReceive}`);
-                let jengabalance = await jenga.getBalance();
-                console.log(`Jenga Balance: KES ${jengabalance.balances[0].amount}`);                
-
-                if(jengabalance.balances[0].amount>kesAmountToReceive){
-                  console.log(txhash, ' Transaction hash is valid...processing payout')
-                  let jengaResponse = await processApiWithdraw(userMSISDN, kesAmountToReceive, txhash);
-                  console.log(jengaResponse);
-                  await setProcessedTransaction(txhash, withdrawDetails)
-                  console.log(txhash, ' Transaction processing successful')
-                  res.json({
-                    "status" : "successful",
-                    "Message" : "Withdraw Transaction processing successful",
-                    "cusdDetails" : withdrawDetails,
-                    "MpesaDetails" : jengaResponse
-                  });
-                }else{
+                let isProcessed = await getProcessedTransaction(txhash);
+                console.log('isProcessed: ', isProcessed) 
+                if(isProcessed === true){
                   let message = {
                     "status": `failed`,
-                    "message": `Not enough fiat balance to fulfill the request`,
-                    "details" : `Contact support to reverse your tx: ${txhash}`
+                    "message": `Transaction Hash is already processed`
                   };
                   res.json(message);
-                }
-              }  
-            }
-          }catch(e){console.log(e)}
+
+                }else{
+                  let withdrawDetails = {
+                    "blockNumber" : txdetails.txblock,
+                    "value" : `${txdetails.value} CUSD`,
+                    "from" : txdetails.from,
+                    "to" : txdetails.to,
+                    "date" : new Date().toLocaleString()
+                  }
+                  let _cusdAmount = number_format(txdetails.value, 4)
+                  let cusdWithdrawRate = usdMarketRate*0.98;
+                  let kesAmountToReceive =  _cusdAmount*cusdWithdrawRate;
+                  console.log(`Withdraw Amount KES: ${kesAmountToReceive}`);
+                  let jengabalance = await jenga.getBalance();
+                  console.log(`Jenga Balance: KES ${jengabalance.balances[0].amount}`);                
+
+                  if(jengabalance.balances[0].amount>kesAmountToReceive){
+                    console.log(txhash, ' Transaction hash is valid...processing payout')
+                    let jengaResponse = await processApiWithdraw(userMSISDN, kesAmountToReceive, txhash);
+                    console.log(jengaResponse);
+                    await setProcessedTransaction(txhash, withdrawDetails)
+                    console.log(txhash, ' Transaction processing successful')
+                    res.json({
+                      "status" : "successful",
+                      "Message" : "Withdraw Transaction processing successful",
+                      "cusdDetails" : withdrawDetails,
+                      "MpesaDetails" : jengaResponse
+                    });
+                  }else{
+                    let message = {
+                      "status": `failed`,
+                      "message": `Not enough fiat balance to fulfill the request`,
+                      "details" : `Contact support to reverse your tx: ${txhash}`
+                    };
+                    res.json(message);
+                  }
+                }  
+              }
+            }catch(e){console.log(e)}
+          }else{
+            let message = {
+              "status": `failed`,
+              "message": `Invalid Transaction`,
+              "blockNumber" : txdetails.txblock,
+              "latestBlock" : _latestblock
+            };
+            console.log('txdetails.status: ', JSON.stringify(txdetails))
+            res.json(message);
+          }
+
         }else{
           let message = {
             "status": `failed`,
-            "message": `Invalid Transaction`,
-            "blockNumber" : txdetails.txblock,
-            "latestBlock" : _latestblock
+            "message" : `Invalid Hash`,
+            "comment" : `${txdetails.status}`
           };
-          console.log('txdetails.status: ', JSON.stringify(txdetails))
           res.json(message);
         }
-
       }else{
         let message = {
           "status": `failed`,
-          "message" : `Invalid Hash`,
-          "comment" : `${txdetails.status}`
+          "message": `Invalid Transaction Receipt`,
+          "comment": `Only transactions to the Escrow address can be processed`
         };
         res.json(message);
       }
-    }else{
+    }else{  
       let message = {
         "status": `failed`,
-        "message": `Invalid Transaction Receipt`,
-        "comment": `Only transactions to the Escrow address can be processed`
+        "description": `Invalid Hash`,
+        "comment" : `Transaction hash cannot be empty`
       };
       res.json(message);
     }
-  }else{  
-  let message = {
-    "status": `failed`,
-    "description": `Invalid Hash`,
-    "comment" : `Transaction hash cannot be empty`
-  };
-  res.json(message);
-}
+  }else{
+    let message = { 
+      "status" : `error`,      
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid KE phoneNumber`      
+    };
+    res.json(message);
+  }
 });
 
 restapi.post('/jengakyc', async (req, res) => {
@@ -1197,70 +1242,88 @@ restapi.post('/kyc', async (req, res) => {
       userMSISDN = phoneUtil.format(recnumber, PNF.E164);
     } catch (err) { console.log(err); }
     userMSISDN = userMSISDN.substring(1);
-    // console.log(`Validated Number: ${validatedNumber}`);
-    // VALIDATE DOB
-    // var m = moment(dateofbirth, 'YYYY-MM-DD');
-    // isDobValid
-    if(isDobValid(dateofbirth)==false){
-      let message = {       
-        "status": `error`, 
-        "Details": `Invalid Date format`,
-        "comment": `Set date to format: YYYY-MM-DD`   
-      };  
-      res.json(message);
-      return;
-    }
-    
-    console.log('userMSISDN: ', userMSISDN)
-    let userId  = await getSenderId(userMSISDN)
-    console.log('UserId: ', userId)
+    let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+    console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
 
-    let newUserPin = await getPinFromUser();
-    console.log('newUserPin', newUserPin)
-    let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+    let _isDobValid = await isDobValid(dateofbirth);
+    console.log('isDobValid ', _isDobValid);
 
-    console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+    let _emailIsValid = emailIsValid (email);
+    console.log('emailIsValid ', _emailIsValid);
+
+    if(_isValidKePhoneNumber && _isDobValid && _emailIsValid){
+      // console.log(`Validated Number: ${validatedNumber}`);
+      // VALIDATE DOB
+      // var m = moment(dateofbirth, 'YYYY-MM-DD');
+      // let _isDobValid = await isDobValid(dateofbirth);
+      // if(_isDobValid == true){
+      //   let message = {       
+      //     "status": `error`, 
+      //     "Details": `Invalid Date format`,
+      //     "comment": `Set date to format: YYYY-MM-DD`   
+      //   };  
+      //   res.json(message);
+      //   return;
+      // }
+      
+      console.log('userMSISDN: ', userMSISDN)
+      let userId  = await getSenderId(userMSISDN)
+      console.log('UserId: ', userId)
+
+      let newUserPin = await getPinFromUser();
+      console.log('newUserPin', newUserPin)
+      let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+
+      console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
 
 
-    let userstatusresult = await checkIfSenderExists(userId);
-    console.log("User Exists? ",userstatusresult);
-    // if(userstatusresult == false){ await addUserDataToDB(userId, userMSISDN); console.log('creating user acoount');  } 
-    if(userstatusresult == false){ 
-      let userCreated = await createNewUser(userId, userMSISDN);     
-      console.log('Created user with userID: ', userCreated);   
-      let message = {       
-        "status": `error`, 
-        "phoneNumber" : `${userMSISDN}`,
-        "Details": `The user account cannot be created from the KYC API`   
-      };    
-      res.json(message);
-      return;
-    } 
+      let userstatusresult = await checkIfSenderExists(userId);
+      console.log("User Exists? ",userstatusresult);
+      // if(userstatusresult == false){ await addUserDataToDB(userId, userMSISDN); console.log('creating user acoount');  } 
+      if(userstatusresult == false){ 
+        let userCreated = await createNewUser(userId, userMSISDN);     
+        console.log('Created user with userID: ', userCreated);   
+        // let message = {       
+        //   "status": `error`, 
+        //   "phoneNumber" : `${userMSISDN}`,
+        //   "Details": `The user account cannot be created from the KYC API`   
+        // };    
+        // res.json(message);
+        // return;
+      } 
 
-    let isKyced = await checkisUserKyced(userId);
-    //If Already KYC'd
-    if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
-    else{  //NOT KYC'd
-      let kycData = {
-        "documentType" : documentType,
-        "documentNumber" : documentNumber,
-        "dateofbirth" : dateofbirth,
-        "fullName" : `${firstname} ${lastname}`
+      let isKyced = await checkisUserKyced(userId);
+      //If Already KYC'd
+      if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
+      else{  //NOT KYC'd
+        let kycData = {
+          "documentType" : documentType,
+          "documentNumber" : documentNumber,
+          "dateofbirth" : dateofbirth,
+          "fullName" : `${firstname} ${lastname}`
+        }
+
+        //Update User account and enable
+        let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
+        await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+
+        // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
+        //save KYC data to KYC DB
+        let newkycdata = await addUserKycToDB(userId, kycData);
+        let message = {       
+          "status": `success`, 
+          "Details": `KYC completed successfully`   
+        };    
+        res.json(message);    
       }
-
-      //Update User account and enable
-      let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
-
-      await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
-
-      // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
-      //save KYC data to KYC DB
-      let newkycdata = await addUserKycToDB(userId, kycData);
-      let message = {       
-        "status": `success`, 
-        "Details": `KYC completed successfully`   
-      };    
-      res.json(message);    
+    }else{
+      let message = { 
+        "status" : `error`,      
+        "phoneNumber": `${userMSISDN}`,
+        "dateofbirth": `${dateofbirth}`,
+        "message": `The data provided is not valid`      
+      };
+      res.json(message);
     }
   }catch(e){
     console.log(e)
