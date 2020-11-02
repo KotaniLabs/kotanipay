@@ -3,7 +3,6 @@
 // Firebase init
  const functions = require('firebase-functions');
  const admin = require('firebase-admin');
- //const firebase-admin = require('firebase-admin');
  const serviceAccount = require("./config/serviceAccountKey.json");
 
  admin.initializeApp({
@@ -1333,7 +1332,7 @@ restapi.post('/kyc', async (req, res) => {
       }
     }else{
       let message = { 
-        "status" : `error`,      
+        "status" : `104: error`,      
         "phoneNumber": `${userMSISDN}`,
         "dateofbirth": `${dateofbirth}`,
         "message": `The data provided is not valid`      
@@ -1343,9 +1342,9 @@ restapi.post('/kyc', async (req, res) => {
   }catch(e){
     console.log(e)
     let message = {       
-      "status": `error`, 
+      "status": `503: error`, 
       "Details": `Invalid PhoneNumber Supplied`,
-      "comment": `Used a valid kenyan PhoneNumber`   
+      "comment": `The server did not understand your request`   
     };  
     res.json(message);  
   }
@@ -1376,7 +1375,7 @@ async function validateCeloTransaction(txhash){
 async function processApiWithdraw(withdrawMSISDN, amount, txhash){
     // let withdrawMSISDN = phoneNumber.substring(1); 
     console.log('Amount to Withdraw: KES.', amount);
-    amount = await number_format(amount, 2);
+    amount = await number_format(amount, 0);
     console.log('Rounded Amount to Withdraw: KES.', amount);
     let displayName = '';
     withdrawId = await getSenderId(withdrawMSISDN);
