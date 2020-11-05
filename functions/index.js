@@ -30,6 +30,52 @@ const express = require('express');
  const jengaApi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
  var restapi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }), bearerToken());
 
+
+// Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
+// The Firebase ID token needs to be passed as a Bearer token in the Authorization HTTP header like this:
+// `Authorization: Bearer <Firebase ID Token>`.
+// when decoded successfully, the ID Token content will be added as `req.user`.
+const validateFirebaseIdToken = async (req, res, next) => {
+  console.log('Check if request is authorized with Firebase ID token');
+
+  if ((!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) &&
+      !(req.cookies && req.cookies.__session)) {
+    console.error('No Firebase ID token was passed as a Bearer token in the Authorization header.',
+        'Make sure you authorize your request by providing the following HTTP header:',
+        'Authorization: Bearer <Firebase ID Token>',
+        'or by passing a "__session" cookie.');
+    res.status(403).send('Unauthorized');
+    return;
+  }
+
+  let idToken;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    console.log('Found "Authorization" header');
+    // Read the ID Token from the Authorization header.
+    idToken = req.headers.authorization.split('Bearer ')[1];
+  } else if(req.cookies) {
+    console.log('Found "__session" cookie');
+    // Read the ID Token from cookie.
+    idToken = req.cookies.__session;
+  } else {
+    // No cookie
+    res.status(403).send('Unauthorized');
+    return;
+  }
+
+  try {
+    const decodedIdToken = await admin.auth().verifyIdToken(idToken);
+    console.log('ID Token correctly decoded', decodedIdToken);
+    req.user = decodedIdToken;
+    next();
+    return;
+  } catch (error) {
+    console.error('Error while verifying Firebase ID token:', error);
+    res.status(403).send('Unauthorized');
+    return;
+  }
+};
+
 // Initialize the firebase auth
 // const firebaseAuth = createFirebaseAuth({ ignoredUrls: ['/ignore'], serviceAccount, admin });
 
@@ -354,11 +400,32 @@ app.post("/", async (req, res) => {
   } 
     
  //  2. DEPOSIT FUNDS
-  else if ( data[0] == '2' && data[1] == null) { 
+ else if ( data[0] == '2' && data[1] == null) { 
+    msg = 'CON Select currency to deposit:';
+    msg += '\n1: M-Pesa';
+    msg += '\n2: cUSD';
+    msg += footer;
+    res.send(msg);
+  } else if ( data[0] == '2' && data[1] == 1) {
+    // M-PESA DEPOSIT
     msg = `CON Deposit funds through Mpesa \nPaybill: 763766\nAccount Number: 915170 \nor\nEazzyPay\nTill Number: 915170\nYour transaction will be confirmed in approx 5mins.`;
     msg += footer;
     res.send(msg);
-   }
+  }  else if ( data[0] == '2' && data[1] == 2 ) {
+    // CUSD DEPOSIT
+    msg = `END You will receive a text with a link to deposit cUSD`;
+    // msg += footer;
+    res.send(msg);
+
+    //Get User Details for Deposit
+    const userMSISDN = phoneNumber.substring(1);
+    const userId = await getSenderId(userMSISDN);
+    const userInfo = await getSenderDetails(userId);
+    const address = userInfo.data().publicAddress;
+    const deeplink = `celo://wallet/pay?address=${address}&displayName=KotaniPay&currencyCode=KES`;
+    const message = `To deposit cUSD to KotaniPay, click this link:\n ${deeplink}`;
+    sendMessage("+"+userMSISDN, message);    
+  }
    // else if ( data[0] == '2' && data[1] == null) { 
    //     msg += `CON Enter Amount to Deposit`;
    //     msg += footer;
@@ -396,7 +463,7 @@ app.post("/", async (req, res) => {
 
     if(_access_pin === saved_access_pin){
       let senderInfo = await getSenderDetails(withdrawId);
-      // @todo: verify that user has enough balance
+      // TODO: verify that user has enough balance
       let usercusdbalance = await getWithdrawerBalance(senderInfo.data().publicAddress); 
       let userkesbalance = usercusdbalance*usdMarketRate
       console.log(`${withdrawMSISDN} balance: ${usercusdbalance} CUSD`);
@@ -750,13 +817,12 @@ function isAuthenticated(req, res, next) {
   }
 }
 
-//@todo: Implement the API authentication
+//TODO: Implement the API authentication
 restapi.post('/jwt', async(req, res) => {
   const privateKey = fs.readFileSync('jenga-api/privatekey.pem', 'utf-8');
   let token = jwt.sign({"body" : "stuff"}, privateKey, {algorithm: 'HS256'});
   res.send(token);
 });
-
 
 //parameters: {"phoneNumber" : "E.164 number" , "amount" : "value"}
 restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
@@ -810,7 +876,7 @@ restapi.post('/sendfunds', async (req, res) => {  //isAuthenticated,
 });
 
 //parameter: {"phoneNumber" : "E.164 number" }
-restapi.post('/getbalance', async (req, res) => {
+restapi.post('/getbalance', validateFirebaseIdToken, async (req, res) => {
   let userMSISDN = req.body.phoneNumber;
   console.log("Received request for: " + req.url);
   try {
@@ -853,7 +919,7 @@ restapi.post('/getbalance', async (req, res) => {
     //console.log(`CELO Balance Before: ${celoBalance}`)
     //celoBalance = kit.web3.utils.fromWei(celoBalance.toString(), 'ether');    
     console.info(`Account balance of ${await weiToDecimal(celoBalance)} CELO`);
-    //@TODO: Apply localization to the balance values
+    //TODO: Apply localization to the balance values
 
     let message = {       
       "Address": `${userInfo.data().publicAddress}`, 
@@ -866,7 +932,8 @@ restapi.post('/getbalance', async (req, res) => {
     res.json(message);
   }else{
     let message = { 
-      "status" : `error`,      
+      "status" : `error`, 
+      "user" : `${req.user.name}` ,    
       "phoneNumber": `${userMSISDN}`, 
       "message": `The number provided is not a valid KE phoneNumber`      
     };
@@ -956,53 +1023,36 @@ restapi.post("/withdraw", async (req, res) => {
   userMSISDN = userMSISDN.substring(1);
   
   let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
-  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber);
 
   if(_isValidKePhoneNumber == true){
     let userId  = await getSenderId(userMSISDN);
-    if(txhash !== null && txhash !==''){  //Check for empty or null tx hash  0xd3625b379fbe8fd5d36906c618f61b53dd8f546e6255a189a7f8be4cc8c00634
+    if(txhash !== null && txhash !==''){
       var txreceipt = await validateCeloTransaction(txhash);
-      if(txreceipt !== null){  //check for a null tx receipt due to invalid hash
-        // console.log('Txn Receipt=> ', JSON.stringify(txreceipt));
+      if(txreceipt !== null){
         console.log('Status: ', txreceipt.status);
-        // let escrowId  = await getSenderId(escrowMSISDN)
-        // let escrowInfo = await getSenderDetails(escrowId);
-        // console.log('User Address => ', escrowInfo.data().publicAddress);
         let escrowAddress = `0x0e93296c605730b88efaf0b698fb8269d022a590`;
 
         let txdetails = await validateWithdrawHash(txhash, escrowAddress);
         // console.log(txdetails)
-        if(txdetails.status === "ok"){ //Valid Deposit to Escrow Hash. Get tx Details        
-          // console.log(txdetails)
-
+        if(txdetails.status === "ok"){
           let validblocks = txdetails.txblock;
-          let _validblocks = parseInt(validblocks)
-          _validblocks = _validblocks + 1440
-
+          let _validblocks = parseInt(validblocks);
+          _validblocks = _validblocks + 1440;
           // console.log('Valid Blocks', _validblocks);
           let latestblock = await getLatestBlock();
           let _latestblock = parseInt(latestblock.number);
-          // console.log('Latest Block', _latestblock);
-          if(txreceipt.status === true && _validblocks >= _latestblock ){   //check that the tx TO: address if the kotaniEscrow Address  //"0xe6b8f07271b97be93d95b18bbe891860b0b7e07f"
+          if(txreceipt.status === true && _validblocks >= _latestblock ){
             console.log('Processing MPESA withdraw Transaction')
             try{
-              //Forward Tx to Jenga API
-              // let existstatus = await checkIfUserAccountExist(userId, userMSISDN);
               let userExists = await checkIfSenderExists(userId);
               if(userExists === false){         
                 let userCreated = await createNewUser(userId, userMSISDN);     
                 console.log('Created user with userID: ', userCreated); 
               }
-              // console.log('Exists: ',existstatus)
-              // let isVerified = await checkIsUserVerified(senderId)
-              // console.log('Verified: ',isVerified)
               let isverified = await checkIfUserisVerified(userId);   
-              console.log('isverified: ', isverified) 
-              // let isKyced = await checkisUserKyced(userId);
-              // if(isKyced == true)
-              if(isverified === false){     //  && data[0] !== '7' && data[1] !== '4'
-                // console.log("User: ", senderId, "is NOT VERIFIED!");
-                // msg += `END Verify your account by dialing *483*354*7*4#`;
+              console.log('isverified: ', isverified);
+              if(isverified === false){
                 res.json({
                   "status": 'unverified',
                   "message": "user account is not verified",
@@ -1066,7 +1116,6 @@ restapi.post("/withdraw", async (req, res) => {
             console.log('txdetails.status: ', JSON.stringify(txdetails))
             res.json(message);
           }
-
         }else{
           let message = {
             "status": `failed`,
@@ -1748,26 +1797,22 @@ async function getWithdrawerBalance(publicAddress){
 }
 
 async function getAccBalance(userMSISDN){
-
   // console.log(userMSISDN);
   let userId  = await getSenderId(userMSISDN);
-  // console.log('UserId: ', userId);   
-  
+  // console.log('UserId: ', userId);
   let userInfo = await getSenderDetails(userId);
   //console.log('User Address => ', userInfo.data().publicAddress);
-  
   const cusdtoken = await kit.contracts.getStableToken();
   const cusdbalance = await cusdtoken.balanceOf(userInfo.data().publicAddress); // In cUSD 
   //cUSDBalance = kit.web3.utils.fromWei(cUSDBalance.toString(), 'ether'); 
   let _cusdbalance = await weiToDecimal(cusdbalance);
   console.info(`Account balance of ${_cusdbalance} CUSD`);
-  _cusdbalance = number_format(_cusdbalance, 4)
-
-  const celotoken = await kit.contracts.getGoldToken()   
-  let celobalance = await celotoken.balanceOf(userInfo.data().publicAddress) // In cGLD
+  _cusdbalance = number_format(_cusdbalance, 4);
+  const celotoken = await kit.contracts.getGoldToken();
+  let celobalance = await celotoken.balanceOf(userInfo.data().publicAddress); // In cGLD
   let _celobalance = await weiToDecimal(celobalance);
   //cGoldBalance = kit.web3.utils.fromWei(celoBalance.toString(), 'ether');    
-  console.info(`Account balance of ${_celobalance} CELO`)
+  console.info(`Account balance of ${_celobalance} CELO`);
   return `CON Your Account Balance is:\n Kenya Shillings: ${_cusdbalance*usdMarketRate} \n0:Home 00:Back`;
 }
 
@@ -1845,7 +1890,6 @@ async function checkIfUserExists(userId){
   });    
 } 
 
-
 function sleep(ms){
   return Promise(resolve => setTimeout(resolve, ms));
 }
@@ -1882,19 +1926,10 @@ async function verifyNewUser(userId, email, newUserPin, password, firstname, las
       })
       .then(userRecord => {
         admin.auth().setCustomUserClaims(userRecord.uid, {verifieduser: true})
-          // console.log('Successfully updated user:', userRecord.toJSON());
-          
-          //Inform user that account is now verified
-          let message2sender = `Welcome to Kotanipay.\nYour account details have been verified.\nDial *483*354# to access the KotaniPay Ecosytem.\nUser PIN: ${newUserPin}`;
-          // let message2receiver = `Welcome to Kotanipay.\nYour account has been created.\nDial *483*354# to verify your account`;
-          // console.log('Send SMS to user: \n',JSON.stringify(message2receiver));
-
-          // @task : Enable once done testing
-          // sendMessage("+"+userMSISDN, message2receiver);
-          console.log('Sending SMS to users => ', JSON.stringify(message2sender));
-          //@task Enable once done testing
-          sendMessage("+"+userMSISDN, message2sender);
-          resolve (userRecord.uid);
+        //Inform user that account is now verified
+        let message2sender = `Welcome to Kotanipay.\nYour account details have been verified.\nDial *483*354# to access the KotaniPay Ecosytem.\nUser PIN: ${newUserPin}`;
+        sendMessage("+"+userMSISDN, message2sender);
+        resolve (userRecord.uid);
       })
       .catch(function(error) {
           console.log('Error updating user:', error);
