@@ -355,8 +355,24 @@ app.post("/", async (req, res) => {
     
  //  2. DEPOSIT FUNDS
   else if ( data[0] == '2' && data[1] == null) { 
+    msg = 'CON Select currency to deposit:';
+    msg += '\n1: M-Pesa';
+    msg += '\n2: cUSD';
+    msg += footer;
+    res.send(msg);
+  } else if ( data[0] == '2' && data[1] == 1) {
+    // M-PESA DEPOSIT
     msg = `CON Deposit funds through Mpesa \nPaybill: 763766\nAccount Number: 915170 \nor\nEazzyPay\nTill Number: 915170\nYour transaction will be confirmed in approx 5mins.`;
     msg += footer;
+    res.send(msg);
+  }  else if ( data[0] == '2' && data[1] == 2 ) {
+    // CUSD DEPOSIT
+    msg = `CON You will receive a text with a link to deposit cUSD`;
+    msg += footer;
+    const address = '0x35e4ae17FDDD24d791ECB46Af95d129f4401D315' // TODO Replace with user address
+    const deeplink = `celo://wallet/pay?address=${address}&displayName=KotaniPay&currencyCode=KES`
+    const message = `To deposit cUSD to KotaniPay, click this link: ${deeplink}`
+    // TODO: Send text that contains 
     res.send(msg);
    }
    // else if ( data[0] == '2' && data[1] == null) { 
