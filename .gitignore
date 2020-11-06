@@ -351,3 +351,11 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules
+.gitignore
+functions/package-lock.json
+functions/.gitignore
