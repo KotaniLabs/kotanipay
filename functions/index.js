@@ -115,6 +115,7 @@ const jenga = require('./jengakit');
 var randomstring = require("randomstring");
 // var tinyURL = require('tinyurl');
 var { getTxidUrl,
+      getDeepLinkUrl,
       getAddressUrl,
       getPinFromUser,
       getEncryptKey,
@@ -419,11 +420,15 @@ app.post("/", async (req, res) => {
 
     //Get User Details for Deposit
     const userMSISDN = phoneNumber.substring(1);
+    const txamount = `5`; 
     const userId = await getSenderId(userMSISDN);
     const userInfo = await getSenderDetails(userId);
+    let displayName = '';
+    await admin.auth().getUser(userId).then(user => { displayName = user.displayName; return; }).catch(e => {console.log(e)}) 
     const address = userInfo.data().publicAddress;
-    const deeplink = `celo://wallet/pay?address=${address}&displayName=KotaniPay&currencyCode=KES`;
-    const message = `To deposit cUSD to KotaniPay, click this link:\n ${deeplink}`;
+    const deeplink = `celo://wallet/pay?address=${address}&displayName=KotaniPay-${displayName}&currencyCode=KES&amount=${txamount}&comment=deposit-to-${userMSISDN}-kotani-wallet`;
+    let url = await getDeepLinkUrl(deeplink);
+    const message = `To deposit cUSD to KotaniPay, \n Address: ${address} \n click this link:\n ${url}`;
     sendMessage("+"+userMSISDN, message);    
   }
    // else if ( data[0] == '2' && data[1] == null) { 

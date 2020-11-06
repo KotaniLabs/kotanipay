@@ -1,260 +1,177 @@
-// CElO init
-const contractkit = require('@celo/contractkit');
-const { isValidPrivate, privateToAddress, privateToPublic, pubToAddress, toChecksumAddress } = require ('ethereumjs-util');
-const bip39 = require('bip39-light');
-// const crypto = require('crypto');
+var tinyURL = require('tinyurl');
+const functions = require('firebase-functions');
+const bodyParser = require('body-parser');
+const moment = require('moment');
 
-const NODE_URL = 'https://celo-mainnet.datahub.figment.network/apikey/b2b43afb38d9a896335580452e687e53/'; 
-const kit = contractkit.newKit(NODE_URL);
-kit.setFeeCurrency(contractkit.CeloContract.StableToken);
-const ethers = require('ethers');
-const provider = new ethers.providers.JsonRpcProvider(NODE_URL);
-const axios = require("axios");
-
-const trimLeading0x = (input) => (input.startsWith('0x') ? input.slice(2) : input);
-const ensureLeading0x = (input) => (input.startsWith('0x') ? input : `0x${input}`);
-const hexToBuffer = (input) => Buffer.from(trimLeading0x(input), 'hex');
+const PNF = require('google-libphonenumber').PhoneNumberFormat;
+const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
 
 // const prettyjson = require('prettyjson');
 // var options = { noColor: true };
+const randomstring = require('randomstring')
 
-function getContractKit(){
-    return kit;
+// AFRICASTALKING API
+const AT_credentials = {
+    apiKey: functions.config().env.at_api.key,
+    username: functions.config().env.at_api.usename
 }
 
-async function transfercGOLD(senderId, recipientId, amount){
-    try{
-      let senderInfo = await getSenderDetails(senderId);
-      console.log('Sender Adress: ',  senderInfo.data().SenderAddress);
-      //console.log('Sender seedkey: ', senderInfo.seedKey);
-      let senderprivkey =  `${await generatePrivKey(senderInfo.data().seedKey)}`;
-      // console.log('Sender Private Key: ',senderprivkey)
-      let receiverInfo = await getReceiverDetails(recipientId);
-      console.log('Receiver Adress: ', receiverInfo.data().publicAddress);      
-      // let cGLDAmount = `${amount*10000000}`;
-      console.log('CELO Amount: ', amount)
-      sendcGold(`${senderInfo.data().publicAddress}`, `${receiverInfo.data().publicAddress}`, amount, senderprivkey)
-    }
-    catch(err){console.log(err)}
+const AfricasTalking = require('africastalking')(AT_credentials);
+const sms = AfricasTalking.SMS;
+
+
+//SEND GET shortURL
+async function getTxidUrl(txid){
+    return await getSentTxidUrl(txid);
 }
 
-//CELOKIT FUNCTIONS
-async function getPublicAddress(mnemonic){
-  // console.log('Getting your account Public Address:....')
-  let privateKey = await generatePrivKey(mnemonic);
-  return new Promise(resolve => { 
-      resolve (getAccAddress(getPublicKey(privateKey)));
+function getSentTxidUrl(txid){      
+    return new Promise(resolve => {    
+        const sourceURL = `https://explorer.celo.org/tx/${txid}/token_transfers`;
+        resolve (tinyURL.shorten(sourceURL))        
+    });
+}
+
+function getDeepLinkUrl(deeplink){      
+  return new Promise(resolve => {    
+      const sourceURL = deeplink;
+      resolve (tinyURL.shorten(sourceURL))        
   });
 }
-
-async function generatePrivKey(mnemonic){
-    return bip39.mnemonicToSeedHex(mnemonic).substr(0, 64);
+ 
+ //GET ACCOUNT ADDRESS shortURL
+ async function getAddressUrl(userAddress){
+     return await getUserAddressUrl(userAddress);
+ }
+ 
+function getUserAddressUrl(userAddress){
+  return new Promise(resolve => {    
+      const sourceURL = `https://explorer.celo.org/address/${userAddress}/tokens`;
+      resolve (tinyURL.shorten(sourceURL));
+    });   
 }
 
-function getPublicKey(privateKey){
-    let privToPubKey = hexToBuffer(privateKey);
-    privToPubKey = privateToPublic(privToPubKey).toString('hex');
-    privToPubKey = ensureLeading0x(privToPubKey);
-    privToPubKey = toChecksumAddress(privToPubKey);
-    return privToPubKey;
+ function getPinFromUser(){
+    return new Promise(resolve => {    
+      let loginpin = randomstring.generate({ length: 4, charset: 'numeric' });
+      resolve (loginpin);
+    });
 }
 
-function getAccAddress(publicKey){
-    let pubKeyToAddress = hexToBuffer(publicKey);
-    pubKeyToAddress = pubToAddress(pubKeyToAddress).toString('hex');
-    pubKeyToAddress = ensureLeading0x(pubKeyToAddress);
-    pubKeyToAddress = toChecksumAddress(pubKeyToAddress)
-    return pubKeyToAddress;   
+function getEncryptKey(userMSISDN){    
+  const crypto = require('crypto');
+  const hash_fn = functions.config().env.algo.key_hash;
+  //console.log('Hash Fn',hash_fn);
+  let key = crypto.createHash(hash_fn).update(userMSISDN).digest('hex');
+  return key;
 }
 
-//0xe0c194103add2db24233f84e2ee7dd549fd79c39a0b23aa12b7b136a251ed304
-async function getTxAmountFromHash(hash){
-  let _tx = await kit.web3.eth.getTransaction(hash);
-  let amount = await weiToDecimal(_tx.value);
-  console.log(amount);
-  return amount;
-}
-
-function checksumAddress(address){
-  let checksumAddress = toChecksumAddress(address)
-  return checksumAddress;   
-}
-
-async function sendcGold(sender, receiver, amount, privatekey){
-  kit.addAccount(privatekey)
-  // const _amount = amount*1e+18    //kit.web3.utils.toWei(amount.toString(), 'ether')
-  const celotoken = await kit.contracts.getGoldToken();
-  const balance = await celotoken.balanceOf(sender);
-  let _balance = kit.web3.utils.fromWei(balance);      //weiToDecimal(balance); 
-  console.log('CELO Balance: ',_balance);
-
-  //const oneGold = kit.web3.utils.toWei('1', 'ether')
-  _balance = parseFloat(_balance);
-  if(amount < _balance){
-    console.log(`${_balance} CELO balance is sufficient`);
-    let _amount = await decimaltoWei(amount);
-    const tx = await celotoken.transfer(receiver, _amount).send({ from: sender, });
-    const hash = await tx.getHash();
-    const receipt = await tx.waitReceipt();
-    console.log('CELO Transaction ID:..... ', JSON.stringify(hash));
-    //let balance = await goldtoken.balanceOf(receiver)
-    return receipt;
-  }else{
-    console.log('Insufficient CELO Balance');
-    return 'failed';
-  }
-}
-
-async function getTransactionBlock(txhash){
-  let _res = await kit.web3.eth.getTransaction(txhash)
-  return _res.blockNumber;
-}
-
-async function weiToDecimal(value){
-    return kit.web3.utils.fromWei(value.toString(), 'ether'); //value/1e+18 
-}
-//console.log('W2D: ',weiToDecimal('10000000000000'))
-
-async function decimaltoWei(value){
-    return kit.web3.utils.toWei(value.toString(), 'ether'); //value*1e+18    
-}  
-//console.log('D2W: ',decimaltoWei(25))
-
-async function sendcUSD(sender, receiver, cusdAmount, privatekey){        
-  const cusdtoken = await kit.contracts.getStableToken()
-  let cusdbalance = await cusdtoken.balanceOf(sender) // In cUSD
-  let _cusdbalance = kit.web3.utils.fromWei(`${cusdbalance}`, 'ether');      //weiToDecimal(balance); 
-  console.log('CUSD Balance: ',_cusdbalance);
-
-  //let _kesAmount = parseFloat(cusdAmount);
-  //const oneGold = kit.web3.utils.toWei('1', 'ether')
-  console.log('Amount transferred: ', cusdAmount)
-  _cusdbalance = parseFloat(_cusdbalance, 4);
-  if(cusdAmount < _cusdbalance){
-    kit.addAccount(privatekey)
-    // console.log(`${_cusdbalance} USD balance is sufficient to fulfil ${cusdAmount}`);
-    let _cusdAmount = await decimaltoWei(cusdAmount);
-    const tx = await cusdtoken.transfer(receiver, _cusdAmount).send({ from: sender, });
-
-    const hash = await tx.getHash();
-    const receipt = await tx.waitReceipt();
-    console.log('USD Transaction ID:..... ', JSON.stringify(hash));
-    return receipt;
-  }else{
-    console.log('Insufficient CUSD Balance');
-    return 'failed';
-  }    
-}
-
-async function buyCelo(address, cusdAmount, privatekey){
-  kit.setFeeCurrency(contractkit.CeloContract.StableToken);
-  kit.addAccount(privatekey)
-
-  const cusdtoken = await kit.contracts.getStableToken()
-  const exchange = await kit.contracts.getExchange()
-
-  cusdbalance = `${await cusdtoken.balanceOf(address)}`
-  console.log(`CUSD Balance: ${kit.web3.utils.fromWei(cusdbalance)}`)
-
-  const tx = await cusdtoken.approve(exchange.address, cusdAmount).send({ from: address, })
-  // console.log(tx)
-  const receipt = await tx.waitReceipt()
-  // console.log(receipt)
-
-  const celoAmount = `${await exchange.quoteUsdSell(cusdAmount)}`
-  console.log(`You will receive ${kit.web3.utils.fromWei(celoAmount, 'ether')} CELO`)
-  const buyCeloTx = await exchange.sellDollar(cusdAmount, celoAmount).send({ from: address, })
-  const buyCeloReceipt = await buyCeloTx.waitReceipt()
-  console.log(buyCeloReceipt)
-}
-
-async function sellCelo(address, celoAmount, privatekey){
-  kit.setFeeCurrency(contractkit.CeloContract.StableToken);
-  kit.addAccount(privatekey)
-  // const _amount = amount*1e+18    //kit.web3.utils.toWei(amount.toString(), 'ether')
-
-  const celotoken = await kit.contracts.getGoldToken()
-  const cusdtoken = await kit.contracts.getStableToken()
-  const exchange = await kit.contracts.getExchange()
+async function createcypher(text, userMSISDN, iv){
+  const crypto = require('crypto');
+  //console.log('cypher Phonenumber', userMSISDN);
+  let key = await getEncryptKey(userMSISDN);
+  const cipher = crypto.createCipher('aes192',  key, iv);
   
-  const celobalance = `${await celotoken.balanceOf(address)}`
-  console.log(`CELO Balance: ${kit.web3.utils.fromWei(celobalance, 'ether')}`)
-
-  const tx = await celotoken.approve(exchange.address, celoAmount).send({ from: address, })
-  // console.log(tx)
-  const receipt = await tx.waitReceipt()
-  // console.log(receipt)
-
-  const cusdAmount = `${await exchange.quoteGoldSell(celoAmount)}`
-  console.log(`You will receive ${kit.web3.utils.fromWei(cusdAmount)} CUSD`)
-  const sellCeloTx = await exchange.sellGold(celoAmount, cusdAmount).send({ from: address, })
-  const sellCeloReceipt = await sellCeloTx.waitReceipt()
-  console.log(sellCeloReceipt)
-  //}
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  //console.log(encrypted);
+  return encrypted; 
 }
-  // getLatestBlock().then(_res=>console.log(_res.number))
-  //working
-  async function getLatestBlock() {
-    return await kit.web3.eth.getBlock('latest');
-  }
+  
+async function decryptcypher(encrypted, userMSISDN, iv){    
+  const crypto = require('crypto');
+  let key = await getEncryptKey(userMSISDN);
+  //console.log('Decrypt key', key);
+  //console.log('IV', iv);
+  // const encrypted = cyphertext;
 
-  async function validateWithdrawHash(hash, escrowAddress){
-    // let hash = '0xe27cf9def976382639789d6465872947b6212649f5e64bf0acabcb4d3d8c1563';
-    try{
-      const tx = await provider.getTransactionReceipt(hash);
-      console.log('FROM: ',tx.from)
-      
-      let response  = await axios.get(`https://explorer.celo.org/api?module=account&action=tokentx&address=${tx.from}#`)
-      // console.log(response.data.result.hash);
-      let txhashes = response.data.result;
-      var kotanitxns =  await txhashes.filter(function(txns) {
-          return txns.hash == hash;
-      });
-      // console.log(kotanitxns);
-      var tokotani =  await kotanitxns.filter(function(txns) {
-          return txns.to == escrowAddress;
-      });
-      // console.log(JSON.stringify(tokotani));
+  const decipher = crypto.createDecipher('aes192', key, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  // console.log(decrypted);
+  return decrypted;
+}
 
-      let txvalues = {
-        "status" : "ok",
-        "from" : tokotani[0].from,
-        "to": tokotani[0].to,
-        "value" : kit.web3.utils.fromWei(tokotani[0].value),
-        "txblock" : tokotani[0].blockNumber
-      };
+  // FUNCTIONS
+function sendMessage(to, message) {
+    const params = {
+        to: [to],
+        message: message,
+        from: 'KotaniPay'
+    }  
+    // console.log('Sending sms to user')
+    sms.send(params)
+        .then(msg=>console.log(JSON.stringify('Sending sms to user: ', to)))
+        .catch(console.log);
+}
 
-      console.log(`Tx Values: `,JSON.stringify(txvalues));
+function arraytojson(item, index, arr) {
+  //arr[index] = item.split('=').join('": "');
+  arr[index] = item.replace(/=/g, '": "');
+  //var jsonStr2 = '{"' + str.replace(/ /g, '", "').replace(/=/g, '": "') + '"}';
+}
 
-      return txvalues;
-        
-    }catch(e){
-      console.log("Cant process Invalid Hash");
-      let txvalues = {
-        "status" : "invalid",
-        "message" : "Cant process Invalid Hash"
-      }
-      return txvalues;
+function stringToObj (string) {
+  var obj = {}; 
+  var stringArray = string.split('&'); 
+  for(var i = 0; i < stringArray.length; i++){ 
+    var kvp = stringArray[i].split('=');
+    if(kvp[1]){
+      obj[kvp[0]] = kvp[1] 
     }
   }
-  
+  return obj;
+}
 
- module.exports = { 
-    transfercGOLD,
-    getPublicAddress,
-    generatePrivKey,
-    getPublicKey,
-    getAccAddress,
-    getTxAmountFromHash,
-    checksumAddress,
-    sendcGold,
-    getTransactionBlock,
-    weiToDecimal,
-    decimaltoWei,
-    getContractKit,
-    sendcUSD,
-    buyCelo,
-    sellCelo,
-    getLatestBlock,
-    validateWithdrawHash
- }
+function parseMsisdn(userMSISDN){
+  try {
+      e64phoneNumber = parsePhoneNumber(`${userMSISDN}`, 'KE')  
+      console.log(e64phoneNumber.number)    
+  } catch (error) {
+      if (error instanceof ParseError) {
+          // Not a phone number, non-existent country, etc.
+          console.log(error.message)
+      } else {
+          throw error
+      }
+  }
+  return e64phoneNumber.number;    
+}
+
+function emailIsValid (email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function isDobValid(dateofbirth){
+  var m = moment(dateofbirth, 'YYYY-MM-DD', true);
+  return m.isValid();
+}
+
+
+function isValidKePhoneNumber(phoneNumber){
+  // let phone = '082 067 0789 ';
+  // let receiverMSISDN = parseMsisdn(data).substring(1)
+  // console.log('E64 Number: ', receiverMSISDN)
+  const _phone = phoneUtil.parseAndKeepRawInput(phoneNumber, 'KE');
+  let isValidKe = phoneUtil.isValidNumber(_phone);
+  //phone = phone.replaceAll("[^0-9]", "");
+  // console.log(isValidKe)
+  return isValidKe;
+}
+
+module.exports = { 
+    getTxidUrl,
+    getDeepLinkUrl,
+    getAddressUrl,
+    getPinFromUser,
+    getEncryptKey,
+    createcypher,
+    decryptcypher,
+    sendMessage,
+    arraytojson,
+    stringToObj,
+    parseMsisdn,
+    emailIsValid,
+    isDobValid,
+    isValidKePhoneNumber
+}
