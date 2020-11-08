@@ -231,7 +231,6 @@ app.post("/", async (req, res) => {
      }else if ( data[0] !== '' && data[1] !== ''  && data[2] == null ) {
       confirmUserPin = data[1];
       // console.log('confirmation PIN ', confirmUserPin);
-
       msg = `CON Enter ID Document Type:\n1. National ID \n2. Passport \n3. AlienID`;
       res.send(msg);
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] == null){ 
@@ -245,25 +244,21 @@ app.post("/", async (req, res) => {
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       documentNumber = data[3];
       // console.log(`${documentType} Number: `, documentNumber);
-
       msg = `CON Enter First Name`;
       res.send(msg);
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       firstname = data[4];
       // console.log('Firstname: ', firstname);
-
       msg = `CON Enter Last Name`;
       res.send(msg);
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] !== '' && data[6] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       lastname = data[5];
       // console.log('Lastname: ', lastname);
-
       msg = `CON Enter Date of Birth.\nFormat: YYYY-MM-DD`;
       res.send(msg);
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== '' && data[7] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       dateofbirth = data[6];
       // console.log('DateOfBirth: ', dateofbirth);
-
       msg = `CON Enter Email Address`;
       res.send(msg);
      }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== ''  && data[7] !== ''){ //data[0] !== null && data[0] !== '' && data[1] == null
@@ -271,30 +266,73 @@ app.post("/", async (req, res) => {
       let userMSISDN = phoneNumber.substring(1);
       let userId = await getSenderId(userMSISDN);  
       let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
-      let isvalidEmail = await validEmail(email);
-      console.log(isvalidEmail);
       // console.log(`User Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
       
       if(newUserPin === confirmUserPin && newUserPin.length >= 4 ){
-        msg = `END Thank You. \nYour Account Details will be verified shortly`;
-        res.send(msg);
+        // msg = `END Thank You. \nYour Account Details will be verified shortly`;
+        // res.send(msg);
 
-        //KYC USER
-        let merchantcode = '9182506466';
-        let countryCode = 'KE';
-        let kycData = await jenga.getUserKyc(merchantcode, documentType, documentNumber, firstname, lastname, dateofbirth, countryCode);
-        console.log('KYC DATA:=> ',JSON.stringify(kycData));
-        // console.log('ID From Jenga: ',kycData.identity.additionalIdentityDetails[0].documentNumber )
-        try{
-          if (kycData !== null && kycData.identity.additionalIdentityDetails[0].documentNumber === documentNumber){
-            //Update User account and enable
-            let updateinfo = await verifyNewUser(userId, email, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
-            await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
-            console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
-            //save KYC data to KYC DB
-            let newkycdata = await addUserKycToDB(userId, kycData);
+        // //KYC USER
+        // let merchantcode = '9182506466';
+        // let countryCode = 'KE';
+        // let kycData = await jenga.getUserKyc(merchantcode, documentType, documentNumber, firstname, lastname, dateofbirth, countryCode);
+        // console.log('KYC DATA:=> ',JSON.stringify(kycData));
+        // // console.log('ID From Jenga: ',kycData.identity.additionalIdentityDetails[0].documentNumber )
+        // try{
+        //   if (kycData !== null && kycData.identity.additionalIdentityDetails[0].documentNumber === documentNumber){
+        //     //Update User account and enable
+        //     let updateinfo = await verifyNewUser(userId, email, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
+        //     await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+        //     console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
+        //     //save KYC data to KYC DB
+        //     let newkycdata = await addUserKycToDB(userId, kycData);
+        //   }
+        // }catch(e){console.log('KYC Failed: No data received')}
+
+
+        //Update of the KYC function
+        let _isDobValid = await isDobValid(dateofbirth);
+        // console.log('isDobValid ', _isDobValid);
+        let _emailIsValid = await emailIsValid(email);
+        // console.log('emailIsValid ', _emailIsValid);
+
+        if(_isDobValid && _emailIsValid){
+          msg = `END Thank You. \nYour Account Details will be verified shortly`;
+          res.send(msg);
+
+          // console.log(`API    KYC Use${userId} : ${newUserPin} :                     ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+          // console.log(`USSD Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+      
+          
+          let kycData = {
+            "documentType" : documentType,
+            "documentNumber" : documentNumber,
+            "dateofbirth" : dateofbirth,
+            "fullName" : `${firstname} ${lastname}`
           }
-        }catch(e){console.log('KYC Failed: No data received')}
+
+          //Update User account and enable
+          let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth,  userMSISDN);
+          await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+
+          // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
+          //save KYC data to KYC DB
+          let newkycdata = await addUserKycToDB(userId, kycData);
+
+          const message = `You have successfully verified your account, \n PIN: ${newUserPin}`;
+          sendMessage("+"+userMSISDN, message);  
+
+
+        }else{
+          !_isDobValid && !_emailIsValid ? msq=`END The date and email provided are invalid,\n RETRY again` :
+          !_isDobValid ? msq=`END The date provided is invalid,\n RETRY again` :
+          !_emailIsValid ? msq=`END The email provided is invalid,\n RETRY again` :
+          msg = `END RETRY again`;
+          res.send(msg);
+        }
+        //End of the KYC line
+        
+
       }
       else if (newUserPin.length < 4 ){
         msg = `END PIN Must be atleast 4 characters,\n RETRY again`;
@@ -412,7 +450,11 @@ app.post("/", async (req, res) => {
     msg = `CON Deposit funds through Mpesa \nPaybill: 763766\nAccount Number: 915170 \nor\nEazzyPay\nTill Number: 915170\nYour transaction will be confirmed in approx 5mins.`;
     msg += footer;
     res.send(msg);
-  }  else if ( data[0] == '2' && data[1] == 2 ) {
+  }  else if ( data[0] == '2' && data[1] == 2 && data [2] == null) {
+    msg = `CON Enter amount to deposit`;
+    msg += footer; 
+    res.send(msg); 
+  } else if (data[0] == '2' && data[1] == 2 && data [2] !== '') {
     // CUSD DEPOSIT
     msg = `END You will receive a text with a link to deposit cUSD`;
     // msg += footer;
@@ -420,16 +462,16 @@ app.post("/", async (req, res) => {
 
     //Get User Details for Deposit
     const userMSISDN = phoneNumber.substring(1);
-    const txamount = `5`; 
+    const txamount = data[2]; 
     const userId = await getSenderId(userMSISDN);
     const userInfo = await getSenderDetails(userId);
     let displayName = '';
     await admin.auth().getUser(userId).then(user => { displayName = user.displayName; return; }).catch(e => {console.log(e)}) 
     const address = userInfo.data().publicAddress;
-    const deeplink = `celo://wallet/pay?address=${address}&displayName=KotaniPay-${displayName}&currencyCode=KES&amount=${txamount}&comment=deposit-to-${userMSISDN}-kotani-wallet`;
+    const deeplink = `celo://wallet/pay?address=${address}&displayName=${displayName}&currencyCode=KES&amount=${txamount}&comment=sending+kes:+${txamount}+to+My+kotani+wallet`;
     let url = await getDeepLinkUrl(deeplink);
     const message = `To deposit cUSD to KotaniPay, \n Address: ${address} \n click this link:\n ${url}`;
-    sendMessage("+"+userMSISDN, message);    
+    sendMessage("+"+userMSISDN, message);  
   }
    // else if ( data[0] == '2' && data[1] == null) { 
    //     msg += `CON Enter Amount to Deposit`;
@@ -1372,7 +1414,7 @@ restapi.post('/kyc', async (req, res) => {
         }
 
         //Update User account and enable
-        let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
+        let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth, userMSISDN);
         await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
 
         // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
