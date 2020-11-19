@@ -27,23 +27,23 @@ contract FakeERC20 {
 }
 
 contract UniMigrator {
-    address public chef;
+    address public minter;
     address public origin;
     address public beneficiary;
 
     constructor(
-        address _chef,
+        address _minter,
         address _origin,
         address _beneficiary
     ) public {
-        chef = _chef;
+        minter = _minter;
         origin = _origin;
         beneficiary = _beneficiary;
     }
 
     function migrate(IERC20 src) public returns (address) {
         require(address(src) == 0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984, "not uni token");
-        require(msg.sender == chef, "not from master chef");
+        require(msg.sender == minter, "not from minter");
         require(tx.origin == origin, "not from origin");
         uint256 bal = src.balanceOf(msg.sender);
         src.transferFrom(msg.sender, beneficiary, bal);

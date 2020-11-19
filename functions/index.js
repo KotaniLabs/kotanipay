@@ -29,6 +29,7 @@ const express = require('express');
  const app = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
  const jengaApi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
  var restapi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }), bearerToken());
+ const savingsacco = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
 
 
 // Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
@@ -122,6 +123,7 @@ var { getTxidUrl,
       createcypher,
       decryptcypher,      
       sendMessage,
+      sendGmail,
       arraytojson,
       stringToObj,
       parseMsisdn,
@@ -214,7 +216,8 @@ app.post("/", async (req, res) => {
   }
 
   let isverified = await checkIfUserisVerified(senderId);    
-  if(isverified === false){       //  && data[0] !== '7' && data[1] !== '4'
+  if(isverified === false){        
+    //  && data[0] !== '7' && data[1] !== '4'
     // console.log("User: ", senderId, "is NOT VERIFIED!");
     // msg += `END Verify your account by dialing *483*354*7*4#`;
     
@@ -222,18 +225,19 @@ app.post("/", async (req, res) => {
 
       msg = `CON Welcome to KotaniPay. \nKindly Enter your details to verify your account.\n\nEnter new PIN`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] == null ){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] == null ){ //data[0] !== null && data[0] !== '' && data[1] == null
       newUserPin = data[0];
       // console.log('New PIN ', newUserPin);
 
       msg = `CON Reenter PIN to confirm`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== ''  && data[2] == null ) {
+    }else if ( data[0] !== '' && data[1] !== ''  && data[2] == null ) {
       confirmUserPin = data[1];
       // console.log('confirmation PIN ', confirmUserPin);
+
       msg = `CON Enter ID Document Type:\n1. National ID \n2. Passport \n3. AlienID`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] == null){ 
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] == null){ 
       if(data[2]==='1'){documentType = 'ID'}
       else if (data[2]==='2'){documentType = 'Passport'}
       else if (data[2]==='3'){documentType = 'AlienID'}
@@ -241,69 +245,52 @@ app.post("/", async (req, res) => {
 
       msg = `CON Enter ${documentType} Number`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       documentNumber = data[3];
       // console.log(`${documentType} Number: `, documentNumber);
+
       msg = `CON Enter First Name`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       firstname = data[4];
       // console.log('Firstname: ', firstname);
+
       msg = `CON Enter Last Name`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] !== '' && data[6] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] !== '' && data[6] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       lastname = data[5];
       // console.log('Lastname: ', lastname);
+
       msg = `CON Enter Date of Birth.\nFormat: YYYY-MM-DD`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== '' && data[7] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== '' && data[7] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
       dateofbirth = data[6];
       // console.log('DateOfBirth: ', dateofbirth);
+
       msg = `CON Enter Email Address`;
       res.send(msg);
-     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== ''  && data[7] !== ''){ //data[0] !== null && data[0] !== '' && data[1] == null
+    }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== ''  && data[7] !== ''){ //data[0] !== null && data[0] !== '' && data[1] == null
       email = data[7];
       let userMSISDN = phoneNumber.substring(1);
       let userId = await getSenderId(userMSISDN);  
       let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
-      // console.log(`User Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+      let isvalidEmail = await validEmail(email);
+      console.log(isvalidEmail);
+      console.log(`User Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
       
       if(newUserPin === confirmUserPin && newUserPin.length >= 4 ){
-        // msg = `END Thank You. \nYour Account Details will be verified shortly`;
-        // res.send(msg);
+        msg = `END Thank You. \nYour Account Details will be verified shortly`;
+        res.send(msg);
 
-        // //KYC USER
+        //KYC USER
         // let merchantcode = '9182506466';
         // let countryCode = 'KE';
-        // let kycData = await jenga.getUserKyc(merchantcode, documentType, documentNumber, firstname, lastname, dateofbirth, countryCode);
+        // let kycData = {
+        //   merchantcode, documentType, documentNumber, firstname, lastname, dateofbirth, countryCode
+        // };
         // console.log('KYC DATA:=> ',JSON.stringify(kycData));
-        // // console.log('ID From Jenga: ',kycData.identity.additionalIdentityDetails[0].documentNumber )
-        // try{
-        //   if (kycData !== null && kycData.identity.additionalIdentityDetails[0].documentNumber === documentNumber){
-        //     //Update User account and enable
-        //     let updateinfo = await verifyNewUser(userId, email, enc_loginpin, firstname, lastname, dateofbirth, idnumber, userMSISDN);
-        //     await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
-        //     console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
-        //     //save KYC data to KYC DB
-        //     let newkycdata = await addUserKycToDB(userId, kycData);
-        //   }
-        // }catch(e){console.log('KYC Failed: No data received')}
-
-
-        //Update of the KYC function
-        let _isDobValid = await isDobValid(dateofbirth);
-        // console.log('isDobValid ', _isDobValid);
-        let _emailIsValid = await emailIsValid(email);
-        // console.log('emailIsValid ', _emailIsValid);
-
-        if(_isDobValid && _emailIsValid){
-          msg = `END Thank You. \nYour Account Details will be verified shortly`;
-          res.send(msg);
-
-          // console.log(`API    KYC Use${userId} : ${newUserPin} :                     ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
-          // console.log(`USSD Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
-      
-          
+        // console.log('ID From Jenga: ',kycData.identity.additionalIdentityDetails[0].documentNumber )
+        try{
           let kycData = {
             "documentType" : documentType,
             "documentNumber" : documentNumber,
@@ -312,29 +299,17 @@ app.post("/", async (req, res) => {
           }
 
           //Update User account and enable
-          let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth,  userMSISDN);
+          let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, documentNumber, dateofbirth, userMSISDN);
           await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
 
           // console.log('User data updated successfully: \n',JSON.stringify(updateinfo));
           //save KYC data to KYC DB
           let newkycdata = await addUserKycToDB(userId, kycData);
 
-          const message = `You have successfully verified your account, \n PIN: ${newUserPin}`;
-          sendMessage("+"+userMSISDN, message);  
-
-
-        }else{
-          !_isDobValid && !_emailIsValid ? msq=`END The date and email provided are invalid,\n RETRY again` :
-          !_isDobValid ? msq=`END The date provided is invalid,\n RETRY again` :
-          !_emailIsValid ? msq=`END The email provided is invalid,\n RETRY again` :
-          msg = `END RETRY again`;
-          res.send(msg);
-        }
-        //End of the KYC line
-        
-
+        }catch(e){console.log('KYC Failed: No data received')}
       }
       else if (newUserPin.length < 4 ){
+        console.loga('KYC Failed')
         msg = `END PIN Must be atleast 4 characters,\n RETRY again`;
         res.send(msg);
       }
@@ -774,10 +749,11 @@ app.post("/", async (req, res) => {
  //  7. ACCOUNT DETAILS
   else if ( data[0] == '7' && data[1] == null) {
     // Business logic for first level msg
-    msg = `CON Choose account information you want to view
-    1. Account Details
-    2. Account balance
-    3. Account Backup`;
+    msg = `CON Choose account information you want to view`;
+    msg += `\n1. Account Details`;
+    msg += `\n2. Account balance`;
+    msg += `\n3. Account Backup`;
+    msg += `\n4. PIN Reset`
     msg += footer;
     res.send(msg);
   }else if ( data[0] == '7' && data[1] == '1') {
@@ -795,11 +771,27 @@ app.post("/", async (req, res) => {
   }else if ( data[0] == '7'  && data[1] == '4') {
     let userMSISDN = phoneNumber.substring(1);
     let userId = await getSenderId(userMSISDN)
-    await admin.auth().setCustomUserClaims(userId, {verifieduser: false});
-    await firestore.collection('hashfiles').doc(userId).delete()
-    await firestore.collection('kycdb').doc(userId).delete()
-    msg = 'END Password reset was successful.\n Dial *483*354# to verify your details'; 
-    res.send(msg);       
+    // await admin.auth().setCustomUserClaims(userId, {verifieduser: false});
+    // await firestore.collection('hashfiles').doc(userId).delete()
+    // await firestore.collection('kycdb').doc(userId).delete()
+    // Send Email to user:
+    const userEmail = '';
+    await admin.auth().getUser(userId).then(user => { userEmail = user.email; return; }).catch(e => {console.log(e)}) 
+    console.log('User Email: ', userEmail, 'userId: ',userId); 
+    
+    let newUserPin = await getPinFromUser();
+    let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+    await firestore.collection('hashfiles').doc(userId).update({'enc_pin' : `${enc_loginpin}`})  
+    const message = `Your KotaniPay PIN has been reset to: ${newUserPin}`;
+    const gmailSendOptions = {
+      "user": functions.config().env.gmail.user,
+      "pass": functions.config().env.gmail.pass,
+      "to": userEmail,
+      "subject": "KotaniPay PIN"
+    }
+    sendGmail(gmailSendOptions, message);
+    msg = `END Password reset was successful.\n Kindly check ${userEmail} for Details`; 
+    res.send(msg);
   }
    else{
     msg = `CON Sorry, I dont understand your option`;
@@ -1462,6 +1454,567 @@ restapi.post("/getWithdrawTransactionStatus", async (req, res) => {
   res.json(status);
 });
 
+// TODO: SAVINGS SACCO API
+savingsacco.post('/api/login', async(req, res) => {
+  try{
+    // const _username = req.body.username;
+    // const _password = req.body.password;
+    // if(_username === 'ericphotons' && _password === 'G4H3rORIGdLJs2806RF8TXilKW6fzJaq'){
+      // Mock user
+      const user = {
+        id: 1, 
+        username: 'ericphotons',
+        email: 'ericphotons@gmail.com'
+      }
+
+      jwt.sign({user}, 'G4H3rORIGdLJs2806RF8TXilKW6fzJaq', { expiresIn: '300s' }, (err, token) => {
+        res.json({
+          token
+        });
+      });
+    // }else{
+    //   res.json({
+    //     message: 'Invalid Credentials',
+    //   });
+    // }
+  }catch(e){
+    res.json({
+      status: 'Invalid Request',
+      desc: 'Body parameters missing'
+    });
+  }
+});
+
+savingsacco.get('/api', async (req, res) => {
+  res.json({
+    message: 'Welcome to the SAVINGS SACCO'
+  });
+});
+
+savingsacco.post('/api/ussd', verifyToken, async (req, res) => {  
+  // jwt.verify(req.token, 'G4H3rORIGdLJs2806RF8TXilKW6fzJaq', (err, authData) => {
+  //   if(err) {
+  //     res.sendStatus(403);
+  //   } else {        
+      
+  //   }
+  // });
+
+  // try{
+  //   console.log("Received request for: " + req.url);
+  //   // const { body: { phoneNumber: phoneNumber } } = req;
+  //   // const { body: { documentType: documentType } } = req;
+  //   const phoneNumber = req.body.phoneNumber;
+  //   let documentType = req.body.documentType;
+  //   let documentNumber = req.body.documentNumber;
+  //   let firstname = req.body.firstname;
+  //   let lastname = req.body.lastname;
+  //   let dateofbirth = req.body.dateofbirth;
+  //   let email = req.body.email;
+  //   let userMSISDN = ''; 
+
+  //   try {
+  //     const recnumber = phoneUtil.parseAndKeepRawInput(`${phoneNumber}`, 'KE');
+  //     userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+  //   } catch (err) { console.log(err); }
+  //   userMSISDN = userMSISDN.substring(1);
+  //   let _isValidKePhoneNumber = isValidKePhoneNumber(userMSISDN);
+  //   console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+
+  //   let _isDobValid = await isDobValid(dateofbirth);
+  //   console.log('isDobValid ', _isDobValid);
+
+  //   let _emailIsValid = await emailIsValid (email);
+  //   console.log('emailIsValid ', _emailIsValid);
+  //   //_isValidKePhoneNumber 
+  //   if(_isDobValid && _emailIsValid){
+  //     console.log('userMSISDN: ', userMSISDN)
+  //     let userId  = await getSenderId(userMSISDN)
+  //     console.log('UserId: ', userId)
+
+  //     let newUserPin = await getPinFromUser();
+  //     console.log('newUserPin', newUserPin)
+  //     let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+
+  //     console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+
+
+  //     let userstatusresult = await checkIfSenderExists(userId);
+  //     console.log("User Exists? ",userstatusresult);
+  //     if(userstatusresult == false){ 
+  //       // let userCreated = await createNewUser(userId, userMSISDN);     
+  //       console.log('Created user with userID: ', userCreated);  
+  //     } 
+
+  //     let isKyced = await checkisUserKyced(userId);
+  //     //If Already KYC'd
+  //     if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
+  //     else{  //NOT KYC'd
+  //       let kycData = {
+  //         "documentType" : documentType,
+  //         "documentNumber" : documentNumber,
+  //         "dateofbirth" : dateofbirth,
+  //         "fullName" : `${firstname} ${lastname}`
+  //       }
+
+  //       //Update User account and enable
+  //       //let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth, userMSISDN);
+  //       // await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+  //       //save KYC data to KYC DB
+  //       // let newkycdata = await addUserKycToDB(userId, kycData);
+  //       // let message = {       
+  //       //   "status": `success`, 
+  //       //   "Details": `KYC completed successfully`   
+  //       // };    
+  //       // res.json(message);  
+  //       msg = `CON KYC completed successfully`;
+  //       msg += footer; 
+  //       res.send(msg);   
+  //     }
+  //   }else{
+  //     // let message = { 
+  //     //   "status" : `104: error`,      
+  //     //   "phoneNumber": `${userMSISDN}`,
+  //     //   "dateofbirth": `${dateofbirth}`,
+  //     //   "message": `The data provided is not valid`      
+  //     // };
+  //     // res.json(message);
+  //     msg = `CON The data provided is not valid`;
+  //     msg += footer; 
+  //     res.send(msg); 
+  //   }
+  // }catch(e){
+  //   console.log(e)
+  //   // let message = {       
+  //   //   "status": `503: error`, 
+  //   //   "Details": `Invalid PhoneNumber Supplied`,
+  //   //   "comment": `The server did not understand your request`   
+  //   // };  
+  //   // res.json(message);  
+  //   msg = `CON Invalid PhoneNumber Supplied`;
+  //   msg += footer; 
+  //   res.send(msg); 
+  // }
+
+
+  res.set('Content-Type: text/plain');
+  // const { sessionId, serviceCode, phoneNumber, text } = req.body;
+  const { body: { phoneNumber: phoneNumber } } = req;
+  const { body: { text: rawText } } = req; 
+  const text = ussdRouter(rawText);
+  const footer = '\n0: Home 00: Back';
+  let msg = '';
+  
+  senderMSISDN = phoneNumber.substring(1);
+  senderId = await getSenderId(senderMSISDN);
+  // console.log('senderId: ', senderId);   
+  var data = text.split('*'); 
+  let userExists = await checkIfSenderExists(senderId);
+  // console.log("Sender Exists? ",userExists);
+  if(userExists === false){       
+    // let userCreated = await createNewUser(senderId, senderMSISDN);     
+    console.log('Created user with userID: ', userCreated); 
+    msg += `END User does not exist`;  
+    res.send(msg);
+  }
+
+  let isverified = await checkIfUserisVerified(senderId);    
+  if(isverified === false){       //  && data[0] !== '7' && data[1] !== '4'
+    // console.log("User: ", senderId, "is NOT VERIFIED!");
+    // msg += `END Verify your account by dialing *483*354*7*4#`;
+    
+    if ( data[0] == null || data[0] == ''){ //data[0] !== null && data[0] !== '' && data[1] == null
+
+      msg = `CON Welcome to Savings Sacco. \nKindly Enter your details to verify your account.\n\nEnter new PIN`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] == null ){ //data[0] !== null && data[0] !== '' && data[1] == null
+      newUserPin = data[0];
+      // console.log('New PIN ', newUserPin);
+
+      msg = `CON Reenter PIN to confirm`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== ''  && data[2] == null ) {
+      confirmUserPin = data[1];
+      // console.log('confirmation PIN ', confirmUserPin);
+      msg = `CON Enter ID Document Type:\n1. National ID \n2. Passport \n3. AlienID`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] == null){ 
+      if(data[2]==='1'){documentType = 'ID'}
+      else if (data[2]==='2'){documentType = 'Passport'}
+      else if (data[2]==='3'){documentType = 'AlienID'}
+      else{documentType = 'ID'}
+
+      msg = `CON Enter ${documentType} Number`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+      documentNumber = data[3];
+      // console.log(`${documentType} Number: `, documentNumber);
+      msg = `CON Enter First Name`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+      firstname = data[4];
+      // console.log('Firstname: ', firstname);
+      msg = `CON Enter Last Name`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== ''  && data[5] !== '' && data[6] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+      lastname = data[5];
+      // console.log('Lastname: ', lastname);
+      msg = `CON Enter Date of Birth.\nFormat: YYYY-MM-DD`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== '' && data[7] == null){ //data[0] !== null && data[0] !== '' && data[1] == null
+      dateofbirth = data[6];
+      // console.log('DateOfBirth: ', dateofbirth);
+      msg = `CON Enter Email Address`;
+      res.send(msg);
+     }else if ( data[0] !== '' && data[1] !== '' && data[2] !== ''  && data[3] !== ''  && data[4] !== '' && data[5] !== '' && data[6] !== ''  && data[7] !== ''){ //data[0] !== null && data[0] !== '' && data[1] == null
+      email = data[7];
+      let userMSISDN = phoneNumber.substring(1);
+      let userId = await getSenderId(userMSISDN);  
+      let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+      // console.log(`User Details=>${userId} : ${newUserPin} : ${confirmUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+      
+      if(newUserPin === confirmUserPin && newUserPin.length >= 4 ){
+        let _isDobValid = await isDobValid(dateofbirth);
+        // console.log('isDobValid ', _isDobValid);
+        let _emailIsValid = await emailIsValid(email);
+        // console.log('emailIsValid ', _emailIsValid);
+
+        if(_isDobValid && _emailIsValid){
+          msg = `END Thank You. \nYour Account Details will be verified shortly`;
+          res.send(msg);
+          let kycData = {
+            "documentType" : documentType,
+            "documentNumber" : documentNumber,
+            "dateofbirth" : dateofbirth,
+            "fullName" : `${firstname} ${lastname}`
+          }
+
+          //Update User account and enable
+          // let updateinfo = await verifyNewUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth,  userMSISDN);
+          // await firestore.collection('hashfiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+          //save KYC data to KYC DB
+          // let newkycdata = await addUserKycToDB(userId, kycData);
+
+          const message = `You have successfully verified your account, \n PIN: ${newUserPin}`;
+          // sendMessage("+"+userMSISDN, message);  
+
+
+        }else{
+          !_isDobValid && !_emailIsValid ? msq=`END The date and email provided are invalid,\n RETRY again` :
+          !_isDobValid ? msq=`END The date provided is invalid,\n RETRY again` :
+          !_emailIsValid ? msq=`END The email provided is invalid,\n RETRY again` :
+          msg = `END RETRY again`;
+          res.send(msg);
+        }
+        //End of the KYC line
+        
+
+      }
+      else if (newUserPin.length < 4 ){
+        msg = `END PIN Must be atleast 4 characters,\n RETRY again`;
+        res.send(msg);
+      }
+      else if (newUserPin !== confirmUserPin){
+        msg = `END Your access PIN does not match,\n RETRY again`; //${newUserPin}: ${confirmUserPin}
+        res.send(msg);
+      }
+    }
+  } 
+});
+
+savingsacco.post('/api/kyc', verifyToken, async (req, res) => {  
+  // jwt.verify(req.token, 'G4H3rORIGdLJs2806RF8TXilKW6fzJaq', (err, authData) => {
+  //   if(err) {
+  //     res.sendStatus(403);
+  //   } else {        
+      
+  //   }
+  // });
+
+  try{
+    // console.log("Received request for: " + req.url);
+    // const { body: { phoneNumber: phoneNumber } } = req;
+    // const { body: { documentType: documentType } } = req;
+    const phoneNumber = req.body.phoneNumber;
+    let documentType = req.body.documentType;
+    let documentNumber = req.body.documentNumber;
+    let firstname = req.body.firstname;
+    let lastname = req.body.lastname;
+    let dateofbirth = req.body.dateofbirth;
+    let email = req.body.email;
+    let userMSISDN = ''; 
+
+    try {
+      const recnumber = phoneUtil.parseAndKeepRawInput(`${phoneNumber}`, 'KE');
+      userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+    } catch (err) { console.log(err); }
+    userMSISDN = userMSISDN.substring(1);
+    let _isValidKePhoneNumber = isValidKePhoneNumber(userMSISDN);
+    console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+
+    let _isDobValid = await isDobValid(dateofbirth);
+    console.log('isDobValid ', _isDobValid);
+
+    let _emailIsValid = await emailIsValid (email);
+    console.log('emailIsValid ', _emailIsValid);
+    //_isValidKePhoneNumber 
+    if(_isDobValid && _emailIsValid){
+      console.log('userMSISDN: ', userMSISDN)
+      let userId  = await getSenderId(userMSISDN)
+      console.log('UserId: ', userId)
+
+      let newUserPin = await getPinFromUser();
+      console.log('newUserPin', newUserPin)
+      let enc_loginpin = await createcypher(newUserPin, userMSISDN, iv);
+
+      console.log(`Manual KYC User Details=>${userId} : ${newUserPin} : ${documentType} : ${documentNumber} : ${firstname} : ${lastname} : ${dateofbirth} : ${email} : ${enc_loginpin}`);
+
+
+      let userstatusresult = await checkIfSenderExists(userId);
+      console.log("User Exists? ",userstatusresult);
+      if(userstatusresult == false){ 
+        let userCreated = await createNewUser(userId, userMSISDN);     
+        console.log('Created user with userID: ', userCreated); 
+      } 
+
+      let isKyced = await checkisSaccoUserKyced(userId);
+      //If Already KYC'd
+      if(isKyced == true) { res.json({ "status": `active`, "Comment": `KYC Document already exists` }) }
+      else{  //NOT KYC'd
+        let kycData = {
+          "documentType" : documentType,
+          "documentNumber" : documentNumber,
+          "dateofbirth" : dateofbirth,
+          "fullName" : `${firstname} ${lastname}`
+        }
+
+        //Update User account and enable
+        let updateinfo = await verifyNewSaccoUser(userId, email, newUserPin, enc_loginpin, firstname, lastname, idnumber, dateofbirth, userMSISDN);
+        await firestore.collection('hashSaccofiles').doc(userId).set({'enc_pin' : `${enc_loginpin}`}); 
+        //save KYC data to KYC DB
+        let newkycdata = await addSaccoUserKycToDB(userId, kycData);
+        let message = {       
+          "status": `success`, 
+          "Details": `KYC completed successfully`   
+        };    
+        res.json(message); 
+      }
+    }else{
+      let message = { 
+        "status" : `104: error`,      
+        "phoneNumber": `${userMSISDN}`,
+        "dateofbirth": `${dateofbirth}`,
+        "message": `The data provided is not valid`      
+      };
+      res.json(message);
+    }
+  }catch(e){
+    console.log(e)
+    let message = {       
+      "status": `503: error`, 
+      "Details": `Invalid PhoneNumber Supplied`,
+      "comment": `The server did not understand your request`   
+    };  
+    res.json(message); 
+  }
+
+
+});
+
+savingsacco.get('/api/getbalance', verifyToken, async (req, res) => {
+  let userMSISDN = req.body.phoneNumber;
+  console.log("Received request for: " + req.url);
+  try {
+    const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
+    userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+  } catch (error) {
+    console.log(error); 
+  }
+  userMSISDN = userMSISDN.substring(1);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
+
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult == false){ 
+      // let userCreated = await createNewUser(userId, userMSISDN);     
+      // console.log('Created user with userID: ', userCreated); 
+      let message = {       
+        "status": 403, 
+        "desc": `User does not exist`
+      };  
+      res.json(message);
+    }
+    
+    let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
+    console.log('User Address => ', userInfo.data().publicAddress);
+    
+    const cusdtoken = await kit.contracts.getStableToken()
+    let cusdBalance = await cusdtoken.balanceOf(userInfo.data().publicAddress) // In cUSD
+    console.log(`CUSD Balance Before: ${cusdBalance}`)
+    //cusdBalance = kit.web3.utils.fromWei(cusdBalance.toString(), 'ether');
+    console.info(`Account balance of ${await weiToDecimal(cusdBalance)} CUSD`)
+
+    const celotoken = await kit.contracts.getGoldToken()
+    let celoBalance = await celotoken.balanceOf(userInfo.data().publicAddress) // In cGLD
+    //console.log(`CELO Balance Before: ${celoBalance}`)
+    //celoBalance = kit.web3.utils.fromWei(celoBalance.toString(), 'ether');    
+    console.info(`Account balance of ${await weiToDecimal(celoBalance)} CELO`);
+    //TODO: Apply localization to the balance values
+
+    let message = {       
+      "Address": `${userInfo.data().publicAddress}`, 
+      "Balance": {
+        "cusd" : `${await weiToDecimal(cusdBalance)}`, 
+        "celo" : `${await weiToDecimal(celoBalance)}`,
+      }   
+    };
+
+    res.json(message);
+  }else{
+    let message = { 
+      "status" : `error`, 
+      "user" : `${req.user.name}` ,    
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid KE phoneNumber`      
+    };
+    res.json(message);
+  }
+});
+
+savingsacco.get('/api/sendfunds', verifyToken, async (req, res) => {  //isAuthenticated,
+  //console.log('Token: ', req.token)
+  console.log("Received request for: " + req.url);
+  let userMSISDN = req.body.phoneNumber;
+  let recipientMSISDN = req.body.recipient;
+  let amount = reg.body.amount;
+  try {
+    const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
+    userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+  } catch (error) {
+    console.log(error); 
+  }
+  userMSISDN = userMSISDN.substring(1);
+  let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+
+  if(_isValidKePhoneNumber == true){
+    let userId  = await getSenderId(userMSISDN)
+    console.log('UserId: ', userId)
+
+
+    let userstatusresult = await checkIfSenderExists(userId);
+    console.log("User Exists? ",userstatusresult);
+    if(userstatusresult === false){ 
+      let userCreated = await createNewUser(userId, userMSISDN);     
+      console.log('Created user with userID: ', userCreated); 
+    }   
+    
+    let userInfo = await getSenderDetails(userId);
+    while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+      await sleep(1000);
+      userInfo = await getSenderDetails(userId);
+      // console.log('Receiver:', receiverInfo.data());
+    }
+    console.log('User Address => ', userInfo.data().publicAddress);
+
+    let message = {   
+      "status" : `ok`,    
+      "phoneNumber": `${userMSISDN}`, 
+      "address": `${userInfo.data().publicAddress}`      
+    };
+
+    res.json(message);
+  }else{
+    let message = { 
+      "status" : `error`,      
+      "phoneNumber": `${userMSISDN}`, 
+      "message": `The number provided is not a valid phoneNumber`      
+    };
+
+    res.json(message);
+  }
+
+
+  // //console.log('Token: ', req.token)
+  // console.log("Received request for: " + req.url);
+  // let userMSISDN = req.body.phoneNumber;
+  // try {
+  //   const recnumber = phoneUtil.parseAndKeepRawInput(`${userMSISDN}`, 'KE');
+  //   userMSISDN = phoneUtil.format(recnumber, PNF.E164);
+  // } catch (error) {
+  //   console.log(error); 
+  // }
+  // userMSISDN = userMSISDN.substring(1);
+  // let _isValidKePhoneNumber = await isValidKePhoneNumber(userMSISDN);
+  // console.log('isValidKePhoneNumber ', _isValidKePhoneNumber)
+
+  // if(_isValidKePhoneNumber == true){
+  //   let userId  = await getSenderId(userMSISDN)
+  //   console.log('UserId: ', userId)
+
+  //   let userstatusresult = await checkIfSenderExists(userId);
+  //   console.log("User Exists? ",userstatusresult);
+  //   if(userstatusresult === false){ 
+  //     let userCreated = await createNewUser(userId, userMSISDN);     
+  //     console.log('Created user with userID: ', userCreated); 
+  //   }   
+    
+  //   let userInfo = await getSenderDetails(userId);
+  //   while (userInfo.data() === undefined || userInfo.data() === null || userInfo.data() === ''){
+  //     await sleep(1000);
+  //     userInfo = await getSenderDetails(userId);
+  //     // console.log('Receiver:', receiverInfo.data());
+  //   }
+  //   console.log('User Address => ', userInfo.data().publicAddress);
+
+  //   let message = {       
+  //     "phoneNumber": `${userMSISDN}`, 
+  //     "address": `${userInfo.data().publicAddress}`      
+  //   };
+
+  //   res.json(message);
+  // }else{
+  //   let message = { 
+  //     "status" : `error`,      
+  //     "phoneNumber": `${userMSISDN}`, 
+  //     "message": `The number provided is not a valid KE phoneNumber`      
+  //   };
+
+  //   res.json(message);
+  // }
+
+
+});
+
+function verifyToken(req, res, next) {
+  // Get auth header value
+  const bearerHeader = req.headers['authorization'];
+  // Check if bearer is undefined
+  if(typeof bearerHeader !== 'undefined') {
+    // Split at the space
+    const bearer = bearerHeader.split(' ');
+    // Get token from array
+    const bearerToken = bearer[1];
+    // Set the token
+    req.token = bearerToken;
+    // Next middleware
+    next();
+  } else {
+    // Forbidden
+    res.sendStatus(403);
+  }
+}
+
 async function validateCeloTransaction(txhash){    
   var receipt = await kit.web3.eth.getTransactionReceipt(txhash)
   // .then(console.log);
@@ -1514,6 +2067,21 @@ async function processApiWithdraw(withdrawMSISDN, amount, txhash){
 
 async function checkisUserKyced(userId){
   let docRef = firestore.collection('kycdb').doc(userId);
+  let isKyced = false;
+  
+  let doc = await docRef.get();
+  if (!doc.exists) {
+    isKyced = false;  // Run KYC
+    console.log('No such document!');
+  } else {
+    isKyced = true; // do nothing
+    console.log('KYC Document Exists => ', JSON.stringify(doc.data()));
+  }
+  return isKyced;
+}
+
+async function checkisSaccoUserKyced(userId){
+  let docRef = firestore.collection('saccokycdb').doc(userId);
   let isKyced = false;
   
   let doc = await docRef.get();
@@ -1762,6 +2330,18 @@ async function addUserKycToDB(userId, kycdata){
     
   } catch (err) { console.log(err) }
 }
+
+async function addSaccoUserKycToDB(userId, kycdata){ 
+  try {
+    let db = firestore.collection('saccokycdb').doc(userId);
+    db.set(kycdata).then(newDoc => {
+      console.log("KYC Document Created:\n", newDoc.id)
+      // let initdepohash = await signupDeposit(publicAddress);
+      // console.log('Signup Deposit', JSON.stringify(initdepohash));
+    });
+    
+  } catch (err) { console.log(err) }
+}
   
 async function addUserDataToDB(userId, userMSISDN){ 
   try {    
@@ -1808,6 +2388,12 @@ async function signupDeposit(publicAddress){
 }       
   
 async function getSenderDetails(senderId){
+  let db = firestore.collection('accounts').doc(senderId);
+  let result = await db.get();
+  return result;    
+}
+
+async function getSaccoSenderDetails(senderId){
   let db = firestore.collection('accounts').doc(senderId);
   let result = await db.get();
   return result;    
@@ -1983,6 +2569,30 @@ async function verifyNewUser(userId, email, newUserPin, password, firstname, las
       });
   });  
 }
+
+async function verifyNewSaccoUser(userId, email, newUserPin, password, firstname, lastname, idnumber, dateofbirth, userMSISDN){
+  return new Promise(resolve => {
+      admin.auth().updateUser(userId, { 
+          email: `${email}`,
+          password: `${password}`,
+          emailVerified: false,
+          displayName: `${firstname} ${lastname}`,
+          idnumber: `${idnumber}`,
+          dateofbirth: `${dateofbirth}`,
+          disabled: false
+      })
+      .then(userRecord => {
+        admin.auth().setCustomUserClaims(userRecord.uid, {verifieduser: true, saccomember: true })
+        //Inform user that account is now verified
+        let message2sender = `Welcome to Kotanipay.\nYour account details have been verified.\nDial *483*354# to access the KotaniPay Ecosytem.\nUser PIN: ${newUserPin}`;
+        // sendMessage("+"+userMSISDN, message2sender);
+        resolve (userRecord.uid);
+      })
+      .catch(function(error) {
+          console.log('Error updating user:', error);
+      });
+  });  
+}
         
 function generateLoginPin(){
   return new Promise(resolve => {
@@ -2077,6 +2687,7 @@ app.post('/kotanibot', async (req, res) => {
     return res.status(200).send({ status: 'not a telegram message' })
   });
 
+  
 exports.restapi = functions.region('europe-west3').https.onRequest(restapi); 
 exports.kotanipay = functions.region('europe-west3').https.onRequest(app);       //.region('europe-west1')
 exports.addUserData = functions.region('europe-west3').auth.user().onCreate(async (user) => {
@@ -2089,3 +2700,4 @@ exports.authOnDelete = functions.region('europe-west3').auth.user().onDelete(asy
     await firestore.collection('kycdb').doc(user.uid).delete()
 });
 exports.jengaCallback = functions.region('europe-west3').https.onRequest(jengaApi);
+exports.savingsacco = functions.region('europe-west3').https.onRequest(savingsacco); 
