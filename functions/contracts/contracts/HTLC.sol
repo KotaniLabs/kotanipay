@@ -2,6 +2,7 @@
 pragma solidity ^0.7.4; 
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import './Hash.sol';
 
 // interface IERC20 {
 //     function transfer(address recipient, uint256 amount) external returns (bool);
@@ -45,9 +46,9 @@ abstract contract Proxy {
 
 contract HTLC {
   uint public startTime;
-  uint public lockTime = 10000 seconds;
-  string public secret; //abracadabra 
-  bytes32 public hash = 0xfd69353b27210d2567bc0ade61674bbc3fc01a558a61c2a0cb2b13d96f9387cd;
+  uint public lockTime = 1800 seconds;
+  string public secret; //referenceCode 
+  bytes32 public hash; = 0xfd69353b27210d2567bc0ade61674bbc3fc01a558a61c2a0cb2b13d96f9387cd;
   address public recipient;
   address public owner; 
   uint public amount; 
@@ -60,8 +61,9 @@ contract HTLC {
     token = IERC20(_token);
   } 
 
-  function fund() external {
+  function fund(string memory _secret) external {
     startTime = block.timestamp;
+    secret = calculateHash(_secret)
     token.transferFrom(msg.sender, address(this), amount);
   }
 
