@@ -7,11 +7,10 @@
 
  admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://kotanimac.firebaseio.com"
+  databaseURL: functions.config().env.firebase.db_url;
  });
 
  const firestore = admin.firestore();
-// require('dotenv').config();
 const crypto = require('crypto');
 const bip39 = require('bip39-light');
 
@@ -19,8 +18,6 @@ const bip39 = require('bip39-light');
 const express = require('express');
  const cors = require('cors');
  const bodyParser = require('body-parser');
- const bearerToken = require('express-bearer-token');
- const jwt = require('jsonwebtoken');
  const fs = require('fs');
  const moment = require('moment');
  const { ussdRouter } = require ('ussd-router');
@@ -29,7 +26,6 @@ const express = require('express');
  const jengaApi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
  const ussdcalls = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
  var restapi = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }), bearerToken());
- const savingsacco = express().use(cors({ origin: true }), bodyParser.json(), bodyParser.urlencoded({ extended: true }));
 
 
 // Express middleware that validates Firebase ID Tokens passed in the Authorization HTTP header.
